@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { ask } from '@tauri-apps/plugin-dialog'
 import { api, countNonEmptyLines } from '../lib/tauri'
 import { csvToEmailPass, filterEmailsBySuccess } from '../lib/transforms'
 import { useFilesCtx } from '../state/FilesContext'
@@ -50,9 +51,10 @@ export function EmailFilterPage({ onStatus }: Props) {
 
   async function replaceEmailsTxt() {
     if (!result) return
-    const ok = window.confirm(
+    const ok = await ask(
       `Replace emails.txt with ${result.length.toLocaleString()} filtered emails?\n\n` +
         `This overwrites the file. The current contents will be lost.`,
+      { title: 'Replace emails.txt?', kind: 'warning', okLabel: 'Replace', cancelLabel: 'Cancel' },
     )
     if (!ok) return
     setBusy('save')

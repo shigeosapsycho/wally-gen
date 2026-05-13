@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { ask } from '@tauri-apps/plugin-dialog'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar, type TabId } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
@@ -34,13 +35,20 @@ export function App() {
     (next: TabId) => {
       if (next === tab) return
       if (tab === 'settings' && settingsDirty && !navWarned) {
-        const ok = window.confirm(
-          'You have unsaved settings changes. Leave anyway?\n\n' +
-            'Your edits stay pending — you can come back and finish, or save now. ' +
-            'Press OK to leave, Cancel to stay.',
-        )
-        if (!ok) return
-        setNavWarned(true)
+        // Native confirm() can fail to render on a Tauri window with custom
+        // decorations; the dialog plugin's ask() always anchors a real OS
+        // modal to the window.
+        void (async () => {
+          const ok = await ask(
+            'You have unsaved settings changes. Leave anyway?\n\n' +
+              'Your edits stay pending — you can come back and finish, or save now.',
+            { title: 'Leave Settings?', kind: 'warning', okLabel: 'Leave', cancelLabel: 'Stay' },
+          )
+          if (!ok) return
+          setNavWarned(true)
+          setTab(next)
+        })()
+        return
       }
       setTab(next)
     },
@@ -54,11 +62,11 @@ export function App() {
   // reads the current value, no listener bookkeeping needed. Trade-off: this
   // path is bypassed for Alt+F4 / taskbar-close — those go through Tauri's
   // default close behavior without a prompt.
-  const requestClose = useCallback(() => {
+  const requestClose = useCallback(async () => {
     if (settingsDirty) {
-      const ok = window.confirm(
-        'You have unsaved settings changes. Close without saving?\n\n' +
-          'Press OK to discard and close, or Cancel to stay.',
+      const ok = await ask(
+        'You have unsaved settings changes. Close without saving?',
+        { title: 'Close Wally Gen?', kind: 'warning', okLabel: 'Close', cancelLabel: 'Stay' },
       )
       if (!ok) return
       setSettingsDirty(false)

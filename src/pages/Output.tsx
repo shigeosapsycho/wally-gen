@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ask } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
 import { useFilesCtx } from '../state/FilesContext'
 
@@ -132,16 +133,43 @@ export function OutputPage({ onStatus }: Props) {
           <button type="button" className="btn-secondary !py-1.5 !px-3 text-xs" onClick={load} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </button>
+          {sub === 'success' && success.rows.length > 0 && (
+            <button
+              type="button"
+              onClick={async () => {
+                const lines: string[] = []
+                for (const r of success.rows) {
+                  const email = (r['email'] ?? '').trim()
+                  const password = (r['password'] ?? '').trim()
+                  if (!email || !password) continue
+                  lines.push(`${email}:${password}`)
+                }
+                try {
+                  await navigator.clipboard.writeText(lines.join('\n'))
+                  onStatus(`Copied ${lines.length.toLocaleString()} email:password pairs`)
+                } catch (e) {
+                  onStatus(`Copy failed: ${e}`)
+                }
+              }}
+              className="btn-secondary !py-1.5 !px-3 text-xs"
+              title="Copy every success as email:password, one per line"
+            >
+              Copy all
+            </button>
+          )}
           {sub === 'failed' && failed.rows.length > 0 && (
             <button
               type="button"
               onClick={async () => {
-                const ok = window.confirm(
-                  `Are you sure?\n\n` +
-                    `This will permanently delete all ${failed.rows.length.toLocaleString()} failure rows ` +
+                // Native window.confirm() can fail to surface in a Tauri
+                // webview that has decorations:false, so we use the dialog
+                // plugin which renders a proper OS-modal anchored to the
+                // window.
+                const ok = await ask(
+                  `This will permanently delete all ${failed.rows.length.toLocaleString()} failure rows ` +
                     `from accounts-failed.csv. This cannot be undone.\n\n` +
-                    `The engine will recreate the file on the next run. ` +
-                    `Press OK to delete, or Cancel to keep them.`,
+                    `The engine will recreate the file on the next run.`,
+                  { title: 'Clear all failures?', kind: 'warning', okLabel: 'Delete', cancelLabel: 'Cancel' },
                 )
                 if (!ok) return
                 try {
