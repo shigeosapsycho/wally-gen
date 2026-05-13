@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CountBadge } from '../components/Card'
 import { api, countNonEmptyLines, envToMap } from '../lib/tauri'
 import { useDebouncedSave } from '../state/useDebouncedSave'
 import { useRunCtx } from '../state/RunContext'
 import { useFilesCtx } from '../state/FilesContext'
+import { csvToEmailPass, filterEmailsBySuccess } from '../lib/transforms'
 import type { Task } from '../state/useRun'
+
+const ENDLESS_STORAGE_KEY = 'wally-gen.endless'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -83,7 +86,32 @@ export function TasksPage({ onStatus }: Props) {
   const proxyCount = useMemo(() => countNonEmptyLines(proxies), [proxies])
   const tasks = useMemo(() => Array.from(run.tasks.values()), [run.tasks])
 
-  function start() {
+  const [endlessMode, setEndlessMode] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(ENDLESS_STORAGE_KEY) === 'on'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ENDLESS_STORAGE_KEY, endlessMode ? 'on' : 'off')
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [endlessMode])
+
+  // Latched at Start time so a user toggling Endless mid-run can't accidentally
+  // arm/disarm chaining for the *current* run.
+  const startedUnderEndlessRef = useRef(false)
+  // Remember the email-list size we kicked off with so a no-progress run
+  // (all remaining emails failing) breaks the chain instead of looping.
+  const lastRunListSizeRef = useRef(0)
+  // Last completedTick we already reacted to, so a second mount or a stale
+  // tick can't re-trigger the chain.
+  const lastChainTickRef = useRef(0)
+
+  const start = useCallback(() => {
     const list = emails.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
     if (list.length === 0) {
       onStatus('No emails to run')
@@ -93,14 +121,109 @@ export function TasksPage({ onStatus }: Props) {
       onStatus('No proxies — fill the proxy list first')
       return
     }
+    startedUnderEndlessRef.current = endlessMode
+    lastRunListSizeRef.current = list.length
+    if (endlessMode) {
+      onStatus(`Endless mode armed — chaining until emails.txt is empty (${list.length.toLocaleString()} emails)`)
+    }
     void run.start(list)
-  }
+  }, [emails, proxyCount, endlessMode, run, onStatus])
+
+  const stop = useCallback(() => {
+    // Manual stop breaks the chain — explicit user intent overrides the
+    // armed Endless flag for this run.
+    if (startedUnderEndlessRef.current) {
+      startedUnderEndlessRef.current = false
+      onStatus('Stopped — Endless mode chain broken')
+    }
+    void run.stop()
+  }, [run, onStatus])
+
+  // Endless chaining: when a run completes naturally, re-filter emails.txt
+  // by accounts.csv and start the next pass if there's still work left.
+  useEffect(() => {
+    if (run.completedTick === 0) return
+    if (run.completedTick === lastChainTickRef.current) return
+    lastChainTickRef.current = run.completedTick
+    if (!startedUnderEndlessRef.current || !endlessMode) return
+
+    let cancelled = false
+    const t = window.setTimeout(async () => {
+      if (cancelled) return
+      try {
+        const [accountsCsv, currentMaster] = await Promise.all([
+          api.readTextFile('accounts.csv').catch(() => ''),
+          api.readTextFile('emails.txt').catch(() => ''),
+        ])
+        const { lines: successPairs } = csvToEmailPass(accountsCsv)
+        const remaining = filterEmailsBySuccess(successPairs.join('\n'), currentMaster)
+
+        if (remaining.length === 0) {
+          onStatus('Endless mode: all emails generated 🎉')
+          startedUnderEndlessRef.current = false
+          return
+        }
+        if (remaining.length >= lastRunListSizeRef.current) {
+          // Zero net successes this pass — every remaining email is
+          // failing repeatedly. Stop instead of looping forever.
+          onStatus(
+            `Endless mode: no progress (${remaining.length.toLocaleString()} remain, all failing). Stopped.`,
+          )
+          startedUnderEndlessRef.current = false
+          return
+        }
+
+        await api.writeTextFile('emails.txt', remaining.join('\n') + '\n')
+        files.bumpEmails()
+        lastRunListSizeRef.current = remaining.length
+
+        onStatus(`Endless mode: chaining (${remaining.length.toLocaleString()} emails left)`)
+        // Slight delay so the user can see the new email-list state before
+        // the next run kicks off.
+        window.setTimeout(() => {
+          if (cancelled || !startedUnderEndlessRef.current || !endlessMode) return
+          void run.start(remaining)
+        }, 1500)
+      } catch (e) {
+        onStatus(`Endless chain failed: ${e}`)
+        startedUnderEndlessRef.current = false
+      }
+    }, 500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
+    // We intentionally exclude `endlessMode` so toggling it mid-completion
+    // doesn't re-fire the effect — the ref-latched check above already
+    // covers that case.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.completedTick])
 
   return (
     <div className="px-10 py-8 max-w-[1600px] mx-auto h-full flex flex-col gap-5 overflow-hidden">
       <header className="shrink-0 flex items-center justify-between">
         <h1 className="text-3xl font-semibold tracking-tight">Tasks</h1>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-4">
+          <label
+            className="inline-flex items-center gap-2 text-sm cursor-pointer select-none"
+            title="Auto-filter emails.txt by accounts.csv after each run and chain a new run until the list is empty."
+          >
+            <input
+              type="checkbox"
+              checked={endlessMode}
+              onChange={(e) => setEndlessMode(e.target.checked)}
+              className="accent-accent w-4 h-4"
+            />
+            <span className={endlessMode ? 'text-accent font-medium' : 'text-muted'}>
+              Endless mode
+            </span>
+            {startedUnderEndlessRef.current && run.state === 'running' && (
+              <span className="ml-1 inline-flex items-center gap-1 text-[10.5px] font-bold tracking-wider uppercase text-accent">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                chaining
+              </span>
+            )}
+          </label>
           <button
             type="button"
             className="btn-primary"
@@ -112,7 +235,7 @@ export function TasksPage({ onStatus }: Props) {
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => void run.stop()}
+            onClick={stop}
             disabled={run.state !== 'running'}
           >
             Stop

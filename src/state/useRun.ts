@@ -29,6 +29,10 @@ export function useRun(onStatus: (s: string) => void) {
   const [state, setState] = useState<RunState>('idle')
   const [tasks, setTasks] = useState<Map<string, Task>>(new Map())
   const [logs, setLogs] = useState<LogLine[]>([])
+  // Bumps each time finalizeRun finishes its reconciliation. Consumers
+  // (e.g. endless mode in Tasks) subscribe to this to know when a run
+  // wrapped up naturally — distinct from a user-initiated stop.
+  const [completedTick, setCompletedTick] = useState(0)
 
   // Mutable handles so the listeners don't get torn down across re-renders.
   const unlistenRef = useRef<UnlistenFn[]>([])
@@ -202,6 +206,10 @@ export function useRun(onStatus: (s: string) => void) {
       )
     } catch (e) {
       pushSystemLog(`Reconcile failed: ${e}`)
+    } finally {
+      // Always bump completedTick so listeners (endless mode) react even
+      // if reconcile threw — they can read the CSVs themselves.
+      setCompletedTick((t) => t + 1)
     }
   }
 
@@ -214,7 +222,7 @@ export function useRun(onStatus: (s: string) => void) {
     [start],
   )
 
-  return { state, tasks, logs, start: wrappedStart, stop, clearLogs, pushSystemLog }
+  return { state, tasks, logs, completedTick, start: wrappedStart, stop, clearLogs, pushSystemLog }
 }
 
 /** Parse a CSV with a header row into a case-insensitive lookup keyed by the
