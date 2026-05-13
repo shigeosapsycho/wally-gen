@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api, envToMap } from '../lib/tauri'
 import { useUpdaterCtx } from '../state/UpdaterContext'
 
@@ -60,13 +60,21 @@ const GROUPS: Group[] = [
 
 export function SettingsPage({ onStatus, onDirtyChange }: Props) {
   const [values, setValues] = useState<Record<string, string>>({})
+  // Snapshot of the values as last loaded/saved — `dirty` is derived from
+  // comparing this baseline to the current `values`. That way editing a field
+  // and reverting it back to its original value correctly clears the dirty
+  // state, instead of latching on the first keystroke.
+  const [baseline, setBaseline] = useState<Record<string, string>>({})
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [dirty, setDirty] = useState(false)
+
+  const dirty = useMemo(() => !recordsEqual(values, baseline), [values, baseline])
 
   useEffect(() => {
     api.readEnv().then((lines) => {
-      setValues(envToMap(lines))
+      const m = envToMap(lines)
+      setValues(m)
+      setBaseline(m)
       setLoaded(true)
     }).catch((e) => onStatus(`Read .env failed: ${e}`))
   }, [onStatus])
@@ -78,14 +86,13 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
 
   function update(key: string, v: string) {
     setValues((s) => ({ ...s, [key]: v }))
-    setDirty(true)
   }
 
   async function save() {
     setSaving(true)
     try {
       await api.writeEnv(values)
-      setDirty(false)
+      setBaseline({ ...values })
       onStatus('Settings saved')
     } catch (e) {
       onStatus(`Save failed: ${e}`)
@@ -212,6 +219,16 @@ function UpdatesSection() {
       </div>
     </section>
   )
+}
+
+function recordsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  const ka = Object.keys(a)
+  const kb = Object.keys(b)
+  if (ka.length !== kb.length) return false
+  for (const k of ka) {
+    if (a[k] !== b[k]) return false
+  }
+  return true
 }
 
 function ImapHostField({
