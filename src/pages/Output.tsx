@@ -6,6 +6,14 @@ type Props = { onStatus: (s: string) => void }
 type SubTab = 'success' | 'failed'
 type Row = Record<string, string>
 
+// Canonical schemas the engine has historically written. Used as a fallback
+// when the CSV on disk has no header row (e.g. after Clear all in an older
+// build wiped the file, and the engine appended rows without re-emitting
+// the header) or has drifted to extra columns.
+const ACCOUNTS_SCHEMA = ['email', 'password', 'authCode', 'identityToken', 'otp']
+const FAILED_SCHEMA = ['email', 'outcome', 'error_code', 'error_msg', 'ts', 'password']
+const FAILED_HEADER_LINE = FAILED_SCHEMA.join(',') + '\n'
+
 type SortDir = 'asc' | 'desc'
 type Sort = { col: string; dir: SortDir } | null
 
@@ -29,8 +37,8 @@ export function OutputPage({ onStatus }: Props) {
           api.readTextFile('accounts.csv').catch(() => ''),
           api.readTextFile('accounts-failed.csv').catch(() => ''),
         ])
-        setSuccess(parseCsv(s))
-        setFailed(parseCsv(f))
+        setSuccess(parseCsv(s, ACCOUNTS_SCHEMA))
+        setFailed(parseCsv(f, FAILED_SCHEMA))
       } catch (e) {
         onStatus(`Read failed: ${e}`)
       } finally {
@@ -133,7 +141,10 @@ export function OutputPage({ onStatus }: Props) {
                 )
                 if (!ok) return
                 try {
-                  await api.writeTextFile('accounts-failed.csv', '')
+                  // Write a canonical header so the engine's next append
+                  // doesn't leave the file headerless (which used to break
+                  // our parser into showing "unknown" rows).
+                  await api.writeTextFile('accounts-failed.csv', FAILED_HEADER_LINE)
                   setOutcomeFilter(null)
                   setShowDupesOnly(false)
                   onStatus('Cleared all failures')
@@ -615,12 +626,23 @@ function formatTs(ts: string): string {
   return m ? `${m[1]} ${m[2]}` : ts
 }
 
-function parseCsv(text: string): { headers: string[]; rows: Row[] } {
+function parseCsv(
+  text: string,
+  fallbackSchema: string[],
+): { headers: string[]; rows: Row[] } {
   const lines = text.split(/\r?\n/).filter((l) => l.length > 0)
-  if (lines.length === 0) return { headers: [], rows: [] }
-  const headers = parseCsvRow(lines[0]!)
+  if (lines.length === 0) return { headers: fallbackSchema, rows: [] }
+  const firstCells = parseCsvRow(lines[0]!)
+  // Treat line 0 as a header only if its first cell matches the schema's
+  // first column name (case-insensitive). Otherwise the engine wrote the
+  // file without a header — fall back to the canonical schema so columns
+  // still line up.
+  const looksLikeHeader =
+    (firstCells[0] ?? '').trim().toLowerCase() === (fallbackSchema[0] ?? '').toLowerCase()
+  const headers = looksLikeHeader ? firstCells : fallbackSchema
+  const startIdx = looksLikeHeader ? 1 : 0
   const rows: Row[] = []
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = startIdx; i < lines.length; i++) {
     const cells = parseCsvRow(lines[i]!)
     const row: Row = {}
     for (let j = 0; j < headers.length; j++) row[headers[j]!] = cells[j] ?? ''
