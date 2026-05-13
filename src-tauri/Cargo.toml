@@ -1,0 +1,31 @@
+[package]
+name = "wally-gen"
+version = "1.1.0"
+description = "Wally Gen — desktop UI for the mclovinbot signup runner"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "wally_gen_lib"
+# Desktop-only build — cdylib/staticlib are needed for mobile targets and
+# their large export tables hit the mingw `ld` "export ordinal too large"
+# bug on the windows-gnu toolchain. rlib is enough for the binary target.
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.1", features = [] }
+tauri-plugin-dialog = "2.0"
+tauri-plugin-opener = "2.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+notify = "6.1"
+notify-debouncer-full = "0.3"
+anyhow = "1"
+once_cell = "1"
+parking_lot = "0.12"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

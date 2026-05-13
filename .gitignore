@@ -1,0 +1,55 @@
+# --- Dependencies ---------------------------------------------------
+node_modules/
+
+# --- Frontend build output -----------------------------------------
+dist/
+build/
+out/
+release/
+.vite/
+
+# --- TypeScript incremental builds ---------------------------------
+*.tsbuildinfo
+
+# tsc -b emits .js/.d.ts siblings for composite-mode configs (only
+# vite.config.ts triggers this for us); ignore the generated pair.
+vite.config.js
+vite.config.d.ts
+
+# --- Rust / Tauri --------------------------------------------------
+# Compiled artifacts and platform-specific scaffolding that Tauri
+# regenerates on demand. Cargo.lock IS committed (this crate is an
+# application, not a library).
+src-tauri/target/
+src-tauri/gen/
+
+# Optional: don't pin per-machine cargo overrides if you ever add them.
+# src-tauri/.cargo/config.local.toml
+
+# --- Logs ----------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Environment / secrets -----------------------------------------
+# .env belongs in the *runtime* folder (the one with run.bat), not in
+# this repo. wally-gen itself doesn't read any .env — ignore them
+# defensively so a stray copy of someone's IMAP creds can't be committed.
+.env
+.env.local
+.env.*.local
+
+# --- Editor / IDE --------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS-generated files --------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+

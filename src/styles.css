@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  /* Custom scrollbar to match the dark theme */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a2a35; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3a48; }
+}
+
+@layer components {
+  .card {
+    @apply bg-card border border-border rounded-xl;
+  }
+  .btn-primary {
+    @apply bg-accent hover:bg-accent/90 active:bg-accent-dim text-white rounded-lg px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply bg-card border border-border hover:bg-card-2 text-text rounded-lg px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .pill {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-accent/15 text-accent;
+  }
+}

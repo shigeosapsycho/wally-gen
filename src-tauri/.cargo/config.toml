@@ -1,0 +1,2 @@
+# Workaround knobs for the windows-gnu toolchain live here; the cdylib bug
+# is solved by trimming crate-type in Cargo.toml, so no overrides needed yet.
