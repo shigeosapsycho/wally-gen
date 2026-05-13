@@ -79,7 +79,10 @@ export function App() {
               </Pane>
             </main>
           </div>
-          <StatusBar text={status} />
+          <StatusBar
+            text={status}
+            warning={settingsDirty ? 'Unsaved changes in Settings' : undefined}
+          />
         </div>
       </UpdaterBridge>
     </RunProvider>

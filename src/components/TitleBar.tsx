@@ -1,7 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useThemeCtx } from '../state/ThemeContext'
 
-const VERSION = '1.4.1'
+const VERSION = '1.4.2'
 
 export function TitleBar() {
   const win = getCurrentWindow()
@@ -71,7 +71,12 @@ function WinButton({
       onClick={onClick}
       className={
         'h-10 w-12 inline-flex items-center justify-center text-muted hover:text-text transition-colors ' +
-        (close ? 'hover:bg-red-600 hover:!text-white' : 'hover:bg-card-2')
+        // The close button sits at the top-right of a Windows 11 window that
+        // DWM rounds with an 8px radius. Match that on the hover background
+        // so the red doesn't spill past the chrome's rounded corner.
+        (close
+          ? 'hover:bg-red-600 hover:!text-white rounded-tr-lg'
+          : 'hover:bg-card-2')
       }
       {...rest}
     >
