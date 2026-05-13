@@ -93,7 +93,12 @@ export function TasksPage({ onStatus }: Props) {
       return false
     }
   })
+  // Mirror endlessMode into a ref so the delayed timers inside the chain
+  // effect can read the live value (toggling off mid-chain cancels the
+  // pending restart, not just future runs).
+  const endlessModeRef = useRef(endlessMode)
   useEffect(() => {
+    endlessModeRef.current = endlessMode
     try {
       window.localStorage.setItem(ENDLESS_STORAGE_KEY, endlessMode ? 'on' : 'off')
     } catch {
@@ -145,11 +150,11 @@ export function TasksPage({ onStatus }: Props) {
     if (run.completedTick === 0) return
     if (run.completedTick === lastChainTickRef.current) return
     lastChainTickRef.current = run.completedTick
-    if (!startedUnderEndlessRef.current || !endlessMode) return
+    if (!startedUnderEndlessRef.current || !endlessModeRef.current) return
 
     let cancelled = false
     const t = window.setTimeout(async () => {
-      if (cancelled) return
+      if (cancelled || !endlessModeRef.current) return
       try {
         const [accountsCsv, currentMaster] = await Promise.all([
           api.readTextFile('accounts.csv').catch(() => ''),
@@ -179,9 +184,10 @@ export function TasksPage({ onStatus }: Props) {
 
         onStatus(`Endless mode: chaining (${remaining.length.toLocaleString()} emails left)`)
         // Slight delay so the user can see the new email-list state before
-        // the next run kicks off.
+        // the next run kicks off. Reads endlessModeRef so an untick during
+        // this window still cancels the restart.
         window.setTimeout(() => {
-          if (cancelled || !startedUnderEndlessRef.current || !endlessMode) return
+          if (cancelled || !startedUnderEndlessRef.current || !endlessModeRef.current) return
           void run.start(remaining)
         }, 1500)
       } catch (e) {
