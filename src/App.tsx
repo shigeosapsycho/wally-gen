@@ -132,6 +132,11 @@ function RunWithFilesBridge({
     () => () => { files.bumpAccounts(); files.bumpFailed() },
     [files],
   )
+  // Live auto-refresh for Output as the engine appends to either CSV.
+  // Wired through useRun's debounced fail/done hooks so the Output tab
+  // re-reads from disk automatically — no Refresh button required.
+  const onFailedRow = useMemo(() => () => files.bumpFailed(), [files])
+  const onDoneRow = useMemo(() => () => files.bumpAccounts(), [files])
 
   // One-shot launch sweep: backfill any EMAIL_EXISTS rows from previous
   // runs that pre-date this feature.
@@ -153,7 +158,10 @@ function RunWithFilesBridge({
   }, [])
 
   return (
-    <RunProvider onStatus={onStatus} hooks={{ onPromoteEmailExists: onPromote }}>
+    <RunProvider
+      onStatus={onStatus}
+      hooks={{ onPromoteEmailExists: onPromote, onFailedRow, onDoneRow }}
+    >
       {children}
     </RunProvider>
   )

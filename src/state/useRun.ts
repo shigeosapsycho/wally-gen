@@ -28,9 +28,16 @@ const MAX_LOG_LINES = 10_000
 
 export type RunHooks = {
   onPromoteEmailExists?: () => void
+  // Fired (debounced) when a new row arrives in accounts-failed.csv or
+  // accounts.csv via the engine's append. Consumers (Output tab) use this
+  // to re-read the file without the user needing to hit Refresh.
+  onFailedRow?: () => void
+  onDoneRow?: () => void
 }
 
 export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
+  const hooksRef = useRef(hooks)
+  hooksRef.current = hooks
   const [state, setState] = useState<RunState>('idle')
   const [tasks, setTasks] = useState<Map<string, Task>>(new Map())
   const [logs, setLogs] = useState<LogLine[]>([])
@@ -41,6 +48,26 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
 
   // Mutable handles so the listeners don't get torn down across re-renders.
   const unlistenRef = useRef<UnlistenFn[]>([])
+
+  // Coalesce burst-y fail/done streams into one hook fire per ~400ms so
+  // Output isn't re-reading the CSV hundreds of times in a row when the
+  // engine batches results. The trailing edge wins, which is what we want.
+  const failBumpTimer = useRef<number | null>(null)
+  const doneBumpTimer = useRef<number | null>(null)
+  const scheduleFailBump = useCallback(() => {
+    if (failBumpTimer.current !== null) window.clearTimeout(failBumpTimer.current)
+    failBumpTimer.current = window.setTimeout(() => {
+      failBumpTimer.current = null
+      hooksRef.current.onFailedRow?.()
+    }, 400)
+  }, [])
+  const scheduleDoneBump = useCallback(() => {
+    if (doneBumpTimer.current !== null) window.clearTimeout(doneBumpTimer.current)
+    doneBumpTimer.current = window.setTimeout(() => {
+      doneBumpTimer.current = null
+      hooksRef.current.onDoneRow?.()
+    }, 400)
+  }, [])
 
   useEffect(() => {
     // Establish event listeners once and reuse them across mounts.
@@ -76,6 +103,7 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
       })
       const u3 = await listen<{ email: string; password: string }>('done', (e) => {
         setTasks((cur) => upsert(cur, e.payload.email, (t) => ({ ...t, status: 'done', password: e.payload.password })))
+        scheduleDoneBump()
       })
       const u4 = await listen<{ email: string; outcome: string; errorCode: string; errorMsg: string }>('fail', (e) => {
         setTasks((cur) => upsert(cur, e.payload.email, (t) => ({
@@ -85,6 +113,7 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
           errorCode: e.payload.errorCode,
           errorMsg: e.payload.errorMsg,
         })))
+        scheduleFailBump()
       })
       const u5 = await listen<{ code: number | null }>('exit', (e) => {
         setState('stopped')
