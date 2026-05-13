@@ -340,6 +340,7 @@ const STATUS_ORDER: Record<Task['status'], number> = {
   pending: 1,
   done: 2,
   failed: 3,
+  stopped: 4,
 }
 
 function sortValue(t: Task, col: SortCol): string | number {
@@ -349,6 +350,7 @@ function sortValue(t: Task, col: SortCol): string | number {
     case 'progress': {
       if (t.status === 'done') return STAGE_ORDER.length + 1
       if (t.status === 'failed') return -1
+      if (t.status === 'stopped') return -2
       if (t.stage) {
         const i = STAGE_ORDER.indexOf(t.stage)
         return i >= 0 ? i + 1 : 0
@@ -412,7 +414,9 @@ function Row({ t }: { t: Task }) {
     t.status === 'done' ? STAGE_ORDER.length :
     t.stage ? Math.max(0, STAGE_ORDER.indexOf(t.stage)) + 1 :
     t.status === 'failed' ? 0 : 0
-  const pct = (stageIdx / STAGE_ORDER.length) * 100
+  // Stopped rows show a full red bar regardless of how far the engine got —
+  // the user explicitly killed the run, so signal that loudly.
+  const pct = t.status === 'stopped' ? 100 : (stageIdx / STAGE_ORDER.length) * 100
 
   return (
     <div className="grid grid-cols-[1fr_180px_140px_180px] items-center px-6 py-2.5 text-sm">
@@ -424,15 +428,19 @@ function Row({ t }: { t: Task }) {
               'h-full rounded ' +
               (t.status === 'done'
                 ? 'bg-emerald-500'
-                : t.status === 'failed'
-                  ? 'bg-red-500/70'
-                  : 'bg-accent')
+                : t.status === 'stopped'
+                  ? 'bg-red-500'
+                  : t.status === 'failed'
+                    ? 'bg-red-500/70'
+                    : 'bg-accent')
             }
             style={{ width: `${pct}%` }}
           />
         </div>
         <div className="mt-1 text-[10px] text-muted truncate">
-          {t.stage ?? (t.status === 'pending' ? 'pending' : t.status === 'done' ? 'done' : '')}
+          {t.status === 'stopped'
+            ? 'stopped'
+            : (t.stage ?? (t.status === 'pending' ? 'pending' : t.status === 'done' ? 'done' : ''))}
         </div>
       </div>
       <div>
@@ -473,6 +481,13 @@ function StatusBadge({ t }: { t: Task }) {
         title={`${t.outcome ?? ''}${t.errorMsg ? ' — ' + t.errorMsg : ''}`}
       >
         {t.outcome ?? 'failed'}
+      </span>
+    )
+  }
+  if (t.status === 'stopped') {
+    return (
+      <span className="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide bg-red-500/25 text-red-700 dark:text-red-400">
+        STOPPED
       </span>
     )
   }

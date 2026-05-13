@@ -8,7 +8,7 @@ import { promoteEmailExists } from '../lib/consolidate'
 // "engine is done, reconcile" signal.
 const RUN_COMPLETE_PATTERN = /Run complete/i
 
-export type TaskStatus = 'pending' | 'running' | 'done' | 'failed'
+export type TaskStatus = 'pending' | 'running' | 'done' | 'failed' | 'stopped'
 
 export type Task = {
   email: string
@@ -159,6 +159,18 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
     try {
       await invoke('stop_run')
       setState('stopped')
+      // Flip every still-in-flight row (pending or running) to 'stopped' so
+      // the user sees the kill take effect immediately. Done/failed rows are
+      // terminal and stay as-is.
+      setTasks((cur) => {
+        const next = new Map(cur)
+        for (const [email, t] of cur) {
+          if (t.status === 'pending' || t.status === 'running') {
+            next.set(email, { ...t, status: 'stopped' })
+          }
+        }
+        return next
+      })
       onStatus('Stopped')
     } catch (e) {
       onStatus(`Stop failed: ${e}`)
@@ -207,7 +219,7 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
       setTasks((cur) => {
         const next = new Map(cur)
         for (const [email, t] of cur) {
-          if (t.status === 'done' || t.status === 'failed') continue
+          if (t.status === 'done' || t.status === 'failed' || t.status === 'stopped') continue
           const ok = successByEmail.get(email.toLowerCase())
           if (ok) {
             next.set(email, { ...t, status: 'done', password: ok['password'] ?? t.password })
