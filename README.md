@@ -123,9 +123,72 @@ src-tauri/
 
 ## Versioning
 
-Bump in four spots when you cut a release:
+Bump in four spots before tagging a release:
 
 - `package.json`
 - `src-tauri/Cargo.toml`
 - `src-tauri/tauri.conf.json`
 - `src/components/TitleBar.tsx` (the `VERSION` constant)
+
+The release workflow verifies all four match the tag and fails fast if any
+drift, so a forgotten bump is caught before the release is published.
+
+## Auto-update
+
+The portable `wally-gen.exe` self-updates from GitHub Releases. On every
+launch the app fires a background `check_for_update` call (3 second delay
+to keep the initial render snappy), compares the latest tag against
+`CARGO_PKG_VERSION`, and surfaces a banner when something newer is
+available. Settings → **Updates** also exposes a manual *Check now*
+button and the latest release notes.
+
+Update lifecycle (Windows):
+
+1. **Check** — `GET https://api.github.com/repos/shigeosapsycho/wally-gen/releases/latest`
+   and look for a `wally-gen.exe` asset.
+2. **Download** — stream the asset to `wally-gen.exe.new` next to the
+   running exe, emitting `update-progress` events for the UI.
+3. **Apply &amp; restart** — rename the running exe to `wally-gen.exe.old`,
+   rename `.new` into its place, spawn the new exe, exit the current
+   process. Windows tolerates renaming a running exe, so the swap is
+   atomic from the user's perspective.
+4. **Cleanup** — on the next launch, `wally-gen.exe.old` is deleted.
+
+Implementation lives in `src-tauri/src/update.rs`. There's no signing
+yet — anyone who can write to the GitHub repo can ship an update, so
+treat the repo's collaborator list as a trust boundary.
+
+## Cutting a release
+
+The `.github/workflows/release.yml` action builds and publishes for you,
+triggered by the **commit message** on `main`. To release `v1.3.0`:
+
+```bash
+# Bump all four version spots, then commit with the version as the
+# message. That's the release signal — no tag needed.
+git commit -am "v1.3.0"
+git push origin main
+```
+
+The action then:
+
+1. Detects the `vX.Y.Z` commit message on main.
+2. Verifies `package.json` / `Cargo.toml` / `tauri.conf.json` all match.
+3. Builds `wally-gen.exe` via `npm run tauri -- build --no-bundle` on
+   `windows-latest` with the MSVC toolchain.
+4. Creates a GitHub Release named after the tag (and creates the git tag
+   at the same commit), with notes auto-generated from the commits since
+   the previous release.
+5. Uploads `wally-gen.exe` (and `WebView2Loader.dll` if emitted) as
+   release assets.
+
+CI uses MSVC, which statically links the WebView2 loader — so the
+CI-built `wally-gen.exe` is fully self-contained. The local
+`windows-gnu` development build still needs `WebView2Loader.dll`
+shipped beside it (see the section above).
+
+Commits with any other message are skipped by the workflow, so normal
+day-to-day work doesn't trigger a release. If you need to rebuild a
+release without retouching git history (e.g. CI flake), trigger the
+workflow manually via the *Run workflow* button on the Actions tab and
+pass the version tag as input.

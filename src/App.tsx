@@ -8,15 +8,19 @@ import { OutputPage } from './pages/Output'
 import { LogsPage } from './pages/Logs'
 import { EmailFilterPage } from './pages/EmailFilter'
 import { RunProvider } from './state/RunContext'
+import { UpdaterProvider } from './state/UpdaterContext'
+import { UpdateBanner } from './components/UpdateBanner'
 
 export function App() {
   const [tab, setTab] = useState<TabId>('tasks')
   const [status, setStatus] = useState('Ready')
 
   return (
+    <UpdaterProvider>
     <RunProvider onStatus={setStatus}>
       <div className="flex flex-col h-full bg-bg text-text">
         <TitleBar />
+        <UpdateBanner onStatus={setStatus} />
         <div className="flex flex-1 min-h-0">
           <Sidebar active={tab} onChange={setTab} />
           <main className="flex-1 min-w-0 overflow-hidden relative">
@@ -43,6 +47,7 @@ export function App() {
         <StatusBar text={status} />
       </div>
     </RunProvider>
+    </UpdaterProvider>
   )
 }
 

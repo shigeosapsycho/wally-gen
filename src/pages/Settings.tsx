@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, envToMap } from '../lib/tauri'
+import { useUpdaterCtx } from '../state/UpdaterContext'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -135,7 +136,67 @@ export function SettingsPage({ onStatus }: Props) {
           </div>
         </section>
       ))}
+
+      <UpdatesSection />
     </div>
+  )
+}
+
+function UpdatesSection() {
+  const u = useUpdaterCtx()
+  return (
+    <section className="card">
+      <h2 className="px-6 pt-5 pb-4 text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+        Updates
+      </h2>
+      <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
+        <div>
+          <div className="text-sm font-medium text-text">Auto-update</div>
+          <div className="text-xs text-muted mt-1">
+            Checks GitHub Releases on launch. Updates are staged and applied on restart.
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-muted">Installed:</span>
+            <span className="font-mono text-text/90">v{u.info?.current ?? 'unknown'}</span>
+            {u.info && (
+              <>
+                <span className="text-muted">·</span>
+                <span className="text-muted">Latest:</span>
+                <span className="font-mono text-text/90">v{u.info.latest}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="btn-secondary !py-1.5 !px-3 text-xs"
+              onClick={() => void u.check()}
+              disabled={u.state === 'checking' || u.state === 'downloading'}
+            >
+              {u.state === 'checking' ? 'Checking…' : 'Check now'}
+            </button>
+            <span className="text-xs text-muted">
+              {u.state === 'up-to-date' && 'You’re on the latest version.'}
+              {u.state === 'available' && u.info && `v${u.info.latest} is available.`}
+              {u.state === 'downloading' && 'Downloading…'}
+              {u.state === 'staged' && 'Update staged. Restart to apply.'}
+              {u.state === 'error' && (u.error ?? 'Check failed.')}
+              {u.state === 'idle' && u.lastChecked === null && 'Not yet checked.'}
+            </span>
+          </div>
+          {u.info?.is_newer && u.info.release_notes && (
+            <details className="text-xs text-muted">
+              <summary className="cursor-pointer hover:text-text">Release notes</summary>
+              <pre className="mt-2 p-3 bg-[#0a0a0f] border border-border rounded-md font-mono text-[11.5px] text-text/80 whitespace-pre-wrap max-h-48 overflow-auto">
+                {u.info.release_notes}
+              </pre>
+            </details>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }
 

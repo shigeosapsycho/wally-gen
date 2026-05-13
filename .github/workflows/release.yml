@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to release, e.g. v1.3.0. Must match package.json.'
+        required: true
+
+permissions:
+  contents: write   # create release, tag, upload assets
+
+jobs:
+  detect:
+    name: Detect release intent
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.parse.outputs.tag }}
+      release: ${{ steps.parse.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse trigger
+        id: parse
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+            echo "Manual trigger with tag $tag"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # On main, the HEAD commit's first line is the release intent.
+          # `v1.3.0` cuts a release; anything else is a normal commit.
+          msg=$(git log -1 --pretty=%s | tr -d '[:space:]')
+          if [[ "$msg" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release commit detected: $msg"
+            echo "tag=$msg" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Non-release commit ('$msg'), skipping."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build & publish ${{ needs.detect.outputs.tag }}
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Rust (MSVC stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Verify tag matches package.json / Cargo.toml / tauri.conf.json
+        shell: pwsh
+        run: |
+          $tag = "${{ needs.detect.outputs.tag }}".TrimStart('v')
+          $pkg = (Get-Content package.json | ConvertFrom-Json).version
+          if ($pkg -ne $tag) { throw "package.json version ($pkg) does not match commit ($tag)" }
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          if ($cargo -ne $tag) { throw "Cargo.toml version ($cargo) does not match commit ($tag)" }
+          $conf = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          if ($conf -ne $tag) { throw "tauri.conf.json version ($conf) does not match commit ($tag)" }
+
+      - name: Build (release, no bundle)
+        run: npm run tauri -- build --no-bundle
+
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          $out = "release-assets"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          Copy-Item "src-tauri/target/release/wally-gen.exe" "$out/wally-gen.exe"
+          # MSVC builds typically statically link WebView2Loader, but if a copy
+          # was emitted, ship it for parity with GNU local builds.
+          $dll = Get-ChildItem -Recurse -ErrorAction SilentlyContinue `
+            "src-tauri/target/release/build/webview2-com-sys-*/out/x64/WebView2Loader.dll" `
+            | Select-Object -First 1
+          if ($dll) { Copy-Item $dll.FullName "$out/WebView2Loader.dll" }
+          Get-ChildItem $out | Format-Table Name,Length
+
+      - name: Create release & upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.detect.outputs.tag }}
+          name: ${{ needs.detect.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/wally-gen.exe
+            release-assets/WebView2Loader.dll
