@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar, type TabId } from './components/Sidebar'
@@ -18,22 +18,31 @@ export function App() {
   const [status, setStatus] = useState('Ready')
   const [settingsDirty, setSettingsDirty] = useState(false)
 
+  // `navWarned` suppresses the leave-Settings prompt after the user has
+  // acknowledged it once during a single dirty session. The banner in the
+  // status bar stays visible regardless — only the dialog is one-shot. As
+  // soon as the form goes clean again (save, or external reload), the gate
+  // resets so a fresh round of edits will prompt anew.
+  const [navWarned, setNavWarned] = useState(false)
+  useEffect(() => {
+    if (!settingsDirty) setNavWarned(false)
+  }, [settingsDirty])
+
   const changeTab = useCallback(
     (next: TabId) => {
       if (next === tab) return
-      if (tab === 'settings' && settingsDirty) {
+      if (tab === 'settings' && settingsDirty && !navWarned) {
         const ok = window.confirm(
-          'You have unsaved settings changes. Leave without saving?\n\n' +
-            'Press OK to discard your changes, or Cancel to stay on Settings.',
+          'You have unsaved settings changes. Leave anyway?\n\n' +
+            'Your edits stay pending — you can come back and finish, or save now. ' +
+            'Press OK to leave, Cancel to stay.',
         )
         if (!ok) return
-        // User chose to discard — the SettingsPage stays mounted with its
-        // edited values; they're just no longer flagged as preventing nav.
-        setSettingsDirty(false)
+        setNavWarned(true)
       }
       setTab(next)
     },
-    [tab, settingsDirty],
+    [tab, settingsDirty, navWarned],
   )
 
   // Guard the close click directly rather than via onCloseRequested. The
