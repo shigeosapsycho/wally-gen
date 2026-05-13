@@ -90,7 +90,7 @@ export function OutputPage({ onStatus }: Props) {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="filter…"
-            className="bg-[#0a0a0f] border border-border rounded-md px-3 py-1.5 text-xs w-48 font-mono text-text/90 placeholder:text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40"
+            className="bg-input border border-border rounded-md px-3 py-1.5 text-xs w-48 font-mono text-text/90 placeholder:text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40"
             spellCheck={false}
           />
           <button type="button" className="btn-secondary !py-1.5 !px-3 text-xs" onClick={load} disabled={loading}>
@@ -166,8 +166,8 @@ function TabButton({
           'ml-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tabular-nums ' +
           (active
             ? fail
-              ? 'bg-red-500/15 text-red-400'
-              : 'bg-emerald-500/15 text-emerald-400'
+              ? 'bg-red-500/15 text-red-700 dark:text-red-400'
+              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
             : 'bg-card-2 text-muted')
         }
       >
@@ -224,7 +224,7 @@ function SuccessTable({
               </span>
             </Td>
             <Td>
-              <span className="font-mono text-[12.5px] text-cyan-300/90 tabular-nums">
+              <span className="font-mono text-[12.5px] text-cyan-700 dark:text-cyan-300/90 tabular-nums">
                 {r['otp']}
               </span>
             </Td>
@@ -274,11 +274,11 @@ function FailureTable({
             </Td>
             <Td>
               <span
-                className="font-mono text-[11.5px] text-red-300/80 line-clamp-2 max-w-[720px] block"
+                className="font-mono text-[11.5px] text-red-700/90 dark:text-red-300/80 line-clamp-2 max-w-[720px] block"
                 title={r['error_msg']}
               >
                 {r['error_code'] && (
-                  <span className="text-amber-300/80 mr-2">{r['error_code']}</span>
+                  <span className="text-amber-700/90 dark:text-amber-300/80 mr-2">{r['error_code']}</span>
                 )}
                 {r['error_msg']}
               </span>
@@ -354,15 +354,15 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
 function outcomeStyle(o: string): { color: string; label: string } {
   switch (o) {
     case 'INKIRU_BLOCK':
-      return { color: 'bg-orange-500/15 text-orange-300', label: 'INKIRU_BLOCK' }
+      return { color: 'bg-orange-500/15 text-orange-700 dark:text-orange-300', label: 'INKIRU_BLOCK' }
     case 'EMAIL_EXISTS':
-      return { color: 'bg-amber-500/15 text-amber-300', label: 'EMAIL_EXISTS' }
+      return { color: 'bg-amber-500/15 text-amber-700 dark:text-amber-300', label: 'EMAIL_EXISTS' }
     case 'EDGE_BLOCKED':
-      return { color: 'bg-red-500/15 text-red-400', label: 'EDGE_BLOCKED' }
+      return { color: 'bg-red-500/15 text-red-700 dark:text-red-400', label: 'EDGE_BLOCKED' }
     case 'OTP_VERIFY_FAILED':
-      return { color: 'bg-rose-500/15 text-rose-300', label: 'OTP_VERIFY_FAILED' }
+      return { color: 'bg-rose-500/15 text-rose-700 dark:text-rose-300', label: 'OTP_VERIFY_FAILED' }
     case 'OTHER_ERROR':
-      return { color: 'bg-red-700/20 text-red-300', label: 'OTHER_ERROR' }
+      return { color: 'bg-red-700/20 text-red-700 dark:text-red-300', label: 'OTHER_ERROR' }
     default:
       return { color: 'bg-card-2 text-muted', label: o || 'unknown' }
   }

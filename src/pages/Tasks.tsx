@@ -94,7 +94,7 @@ export function TasksPage({ onStatus }: Props) {
       <div className="shrink-0 grid grid-cols-2 gap-4">
         <Card title="Email List" badge={<CountBadge count={emailCount} />}>
           <textarea
-            className="mx-4 mb-4 h-32 resize-none rounded-md bg-[#0a0a0f] border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
+            className="mx-4 mb-4 h-32 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
             placeholder="paste one email per line"
             spellCheck={false}
             value={emails}
@@ -103,7 +103,7 @@ export function TasksPage({ onStatus }: Props) {
         </Card>
         <Card title="Proxy List" badge={<CountBadge count={proxyCount} />}>
           <textarea
-            className="mx-4 mb-4 h-32 resize-none rounded-md bg-[#0a0a0f] border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
+            className="mx-4 mb-4 h-32 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
             placeholder="paste one proxy per line"
             spellCheck={false}
             value={proxies}
@@ -190,12 +190,12 @@ function Row({ t }: { t: Task }) {
 
 function StatusBadge({ t }: { t: Task }) {
   if (t.status === 'done') {
-    return <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/15 text-emerald-400">done</span>
+    return <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">done</span>
   }
   if (t.status === 'failed') {
     return (
       <span
-        className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-500/15 text-red-400 cursor-help"
+        className="px-2 py-0.5 rounded text-[11px] font-semibold bg-red-500/15 text-red-700 dark:text-red-400 cursor-help"
         title={`${t.outcome ?? ''}${t.errorMsg ? ' — ' + t.errorMsg : ''}`}
       >
         {t.outcome ?? 'failed'}

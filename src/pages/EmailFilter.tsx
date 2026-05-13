@@ -138,7 +138,7 @@ export function EmailFilterPage({ onStatus }: Props) {
           {result.length === 0 ? (
             <div className="px-5 pb-5 text-muted text-sm">Every master email was filtered out.</div>
           ) : (
-            <pre className="mx-4 mb-4 max-h-[40vh] overflow-auto rounded-md bg-[#0a0a0f] border border-border px-4 py-3 font-mono text-[13px] text-text/90 whitespace-pre-wrap break-all">
+            <pre className="mx-4 mb-4 max-h-[40vh] overflow-auto rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 whitespace-pre-wrap break-all">
               {result.join('\n')}
             </pre>
           )}
@@ -189,7 +189,7 @@ function Panel({
         </div>
       </header>
       <textarea
-        className="mx-4 mb-4 h-56 resize-none rounded-md bg-[#0a0a0f] border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
+        className="mx-4 mb-4 h-56 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
         placeholder={placeholder}
         spellCheck={false}
         value={value}

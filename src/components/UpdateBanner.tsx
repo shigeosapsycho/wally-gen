@@ -79,7 +79,7 @@ export function UpdateBanner({ onStatus }: { onStatus: (s: string) => void }) {
     return (
       <BannerRow tone="red">
         <span className="text-sm">
-          Updater error: <span className="text-red-300 font-mono text-xs">{error}</span>
+          Updater error: <span className="text-red-700 dark:text-red-300 font-mono text-xs">{error}</span>
         </span>
       </BannerRow>
     )

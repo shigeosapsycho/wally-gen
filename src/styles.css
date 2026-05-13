@@ -2,6 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- Theme palettes ----------------------------------------------------
+ * Defaults are the light palette so users with no `dark` class (e.g. the
+ * server-rendered first paint) get a sensible look. The dark palette is
+ * applied via `.dark` on <html> (toggled by useTheme).
+ */
+:root {
+  --c-bg: 247 247 251;          /* #f7f7fb */
+  --c-card: 255 255 255;        /* #ffffff */
+  --c-card-2: 240 240 245;      /* #f0f0f5 */
+  --c-border: 220 220 230;      /* #dcdce6 */
+  --c-input: 245 245 250;       /* #f5f5fa */
+  --c-muted: 99 99 117;         /* #636375 */
+  --c-text: 22 22 30;           /* #16161e */
+  --c-accent: 124 108 246;      /* #7c6cf6 */
+  --c-accent-dim: 91 79 196;    /* #5b4fc4 */
+  --c-scrollbar: 200 200 210;
+  --c-scrollbar-hover: 170 170 185;
+}
+
+.dark {
+  --c-bg: 13 13 18;             /* #0d0d12 */
+  --c-card: 21 21 28;           /* #15151c */
+  --c-card-2: 26 26 34;         /* #1a1a22 */
+  --c-border: 35 35 44;         /* #23232c */
+  --c-input: 10 10 15;          /* #0a0a0f */
+  --c-muted: 138 138 152;       /* #8a8a98 */
+  --c-text: 230 230 237;        /* #e6e6ed */
+  --c-accent: 124 108 246;      /* #7c6cf6 */
+  --c-accent-dim: 91 79 196;
+  --c-scrollbar: 42 42 53;
+  --c-scrollbar-hover: 58 58 72;
+}
+
 @layer base {
   html, body, #root {
     height: 100%;
@@ -13,11 +46,10 @@
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
   }
-  /* Custom scrollbar to match the dark theme */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a35; border-radius: 6px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a48; }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--c-scrollbar)); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-scrollbar-hover)); }
 }
 
 @layer components {

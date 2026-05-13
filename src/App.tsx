@@ -9,6 +9,7 @@ import { LogsPage } from './pages/Logs'
 import { EmailFilterPage } from './pages/EmailFilter'
 import { RunProvider, useRunCtx } from './state/RunContext'
 import { UpdaterProvider } from './state/UpdaterContext'
+import { ThemeProvider } from './state/ThemeContext'
 import { UpdateBanner } from './components/UpdateBanner'
 
 export function App() {
@@ -16,6 +17,7 @@ export function App() {
   const [status, setStatus] = useState('Ready')
 
   return (
+    <ThemeProvider>
     <RunProvider onStatus={setStatus}>
       <UpdaterBridge onStatus={setStatus}>
         <div className="flex flex-col h-full bg-bg text-text">
@@ -45,6 +47,7 @@ export function App() {
         </div>
       </UpdaterBridge>
     </RunProvider>
+    </ThemeProvider>
   )
 }
 

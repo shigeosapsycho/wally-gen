@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api, envToMap } from '../lib/tauri'
 import { useUpdaterCtx } from '../state/UpdaterContext'
+import { useThemeCtx } from '../state/ThemeContext'
+import type { ThemePreference } from '../state/useTheme'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -24,6 +26,7 @@ const IMAP_PRESETS: Array<{ label: string; value: string }> = [
   { label: 'Outlook / Hotmail / Live · outlook.office365.com:993', value: 'outlook.office365.com:993' },
   { label: 'Yahoo · imap.mail.yahoo.com:993', value: 'imap.mail.yahoo.com:993' },
   { label: 'AOL · imap.aol.com:993', value: 'imap.aol.com:993' },
+  { label: 'IONOS · imap.ionos.com:993', value: 'imap.ionos.com:993' },
 ]
 
 type Group = { title: string; fields: FieldSpec[] }
@@ -137,8 +140,58 @@ export function SettingsPage({ onStatus }: Props) {
         </section>
       ))}
 
+      <AppearanceSection />
+
       <UpdatesSection />
     </div>
+  )
+}
+
+function AppearanceSection() {
+  const { preference, effective, setPreference } = useThemeCtx()
+  const options: Array<{ value: ThemePreference; label: string; hint: string }> = [
+    { value: 'system', label: 'System', hint: 'Follow Windows light/dark setting' },
+    { value: 'light', label: 'Light', hint: 'Always light' },
+    { value: 'dark', label: 'Dark', hint: 'Always dark' },
+  ]
+  return (
+    <section className="card">
+      <h2 className="px-6 pt-5 pb-4 text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+        Appearance
+      </h2>
+      <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
+        <div>
+          <div className="text-sm font-medium text-text">Theme</div>
+          <div className="text-xs text-muted mt-1">
+            Currently rendering as{' '}
+            <span className="font-mono text-text/80">{effective}</span>.
+          </div>
+        </div>
+        <div role="radiogroup" aria-label="Theme" className="inline-flex p-1 rounded-lg border border-border bg-card-2 w-fit">
+          {options.map((o) => {
+            const active = preference === o.value
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                title={o.hint}
+                onClick={() => setPreference(o.value)}
+                className={
+                  'px-4 py-1.5 rounded-md text-xs font-medium transition-colors ' +
+                  (active
+                    ? 'bg-accent text-white shadow-sm'
+                    : 'text-muted hover:text-text')
+                }
+              >
+                {o.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -189,7 +242,7 @@ function UpdatesSection() {
           {u.info?.is_newer && u.info.release_notes && (
             <details className="text-xs text-muted">
               <summary className="cursor-pointer hover:text-text">Release notes</summary>
-              <pre className="mt-2 p-3 bg-[#0a0a0f] border border-border rounded-md font-mono text-[11.5px] text-text/80 whitespace-pre-wrap max-h-48 overflow-auto">
+              <pre className="mt-2 p-3 bg-input border border-border rounded-md font-mono text-[11.5px] text-text/80 whitespace-pre-wrap max-h-48 overflow-auto">
                 {u.info.release_notes}
               </pre>
             </details>
@@ -247,7 +300,7 @@ function ImapHostField({
             value={mode}
             onChange={(e) => pickPreset(e.target.value)}
             disabled={disabled}
-            className="w-full appearance-none bg-[#0a0a0f] border border-border rounded-md pl-3 pr-9 py-2 text-[13px] text-text/90 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50 cursor-pointer"
+            className="w-full appearance-none bg-input border border-border rounded-md pl-3 pr-9 py-2 text-[13px] text-text/90 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50 cursor-pointer"
           >
             {IMAP_PRESETS.map((p) => (
               <option key={p.value || 'auto'} value={p.value}>
@@ -266,7 +319,7 @@ function ImapHostField({
         </div>
         {mode === '__other__' && (
           <input
-            className="w-full bg-[#0a0a0f] border border-border rounded-md px-3 py-2 font-mono text-[13px] text-text/90 placeholder:text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
+            className="w-full bg-input border border-border rounded-md px-3 py-2 font-mono text-[13px] text-text/90 placeholder:text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
             placeholder="mail.privateemail.com:993"
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -302,7 +355,7 @@ function Field({
       </div>
       <div className="relative">
         <input
-          className="w-full bg-[#0a0a0f] border border-border rounded-md px-3 py-2 font-mono text-[13px] text-text/90 placeholder:text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
+          className="w-full bg-input border border-border rounded-md px-3 py-2 font-mono text-[13px] text-text/90 placeholder:text-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
           type={isPassword && !reveal ? 'password' : spec.type === 'number' ? 'text' : 'text'}
           inputMode={spec.type === 'number' ? 'numeric' : undefined}
           placeholder={spec.placeholder}

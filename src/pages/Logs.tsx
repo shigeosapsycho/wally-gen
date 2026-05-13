@@ -49,7 +49,7 @@ export function LogsPage({ onStatus }: Props) {
 
       <div
         ref={ref}
-        className="card flex-1 min-h-0 overflow-auto bg-[#0a0a0f] font-mono text-[12.5px] leading-[1.55] p-4"
+        className="card flex-1 min-h-0 overflow-auto bg-input font-mono text-[12.5px] leading-[1.55] p-4"
       >
         {logs.length === 0 ? (
           <div className="text-muted/70 italic">no logs yet — hit Start All on the Tasks tab.</div>
@@ -71,17 +71,17 @@ function LogRow({ line, stream }: { line: string; stream: 'stdout' | 'stderr' | 
 
 function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string {
   if (stream === 'system') return 'text-accent/85'
-  if (stream === 'stderr') return 'text-red-300/85'
+  if (stream === 'stderr') return 'text-red-700 dark:text-red-300/85'
   const u = line.toUpperCase()
   if (
     u.includes('ACCOUNT_CREATED') ||
     u.includes('SOLVER ONLINE') ||
     u.includes('RUN COMPLETE')
   ) {
-    return 'text-emerald-300/90'
+    return 'text-emerald-700 dark:text-emerald-300/90'
   }
   if (u.includes('OTP_DISPATCHED') || u.includes('OTP_RECEIVED')) {
-    return 'text-cyan-300/90'
+    return 'text-cyan-700 dark:text-cyan-300/90'
   }
   if (
     u.includes('EDGE_BLOCKED') ||
@@ -92,7 +92,7 @@ function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string
     u.includes('FAILED') ||
     u.includes('TIMED OUT')
   ) {
-    return 'text-red-300/90'
+    return 'text-red-700 dark:text-red-300/90'
   }
   if (
     u.includes('INKIRU_BLOCK') ||
@@ -100,7 +100,7 @@ function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string
     u.includes('WARN') ||
     u.includes('RETRY')
   ) {
-    return 'text-amber-300/90'
+    return 'text-amber-700 dark:text-amber-300/90'
   }
   if (u.startsWith('==>') || u.startsWith('===') || u.includes('STARTING ')) {
     return 'text-accent/90'
@@ -110,9 +110,9 @@ function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string
 
 const HIGHLIGHTS: Array<{ re: RegExp; className: string }> = [
   { re: /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\b/g, className: 'text-muted/80' },
-  { re: /\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/g, className: 'text-sky-300/80' },
-  { re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, className: 'text-violet-300/90' },
-  { re: /\bHTTP\s\d{3}\b/g, className: 'text-amber-300/90' },
+  { re: /\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/g, className: 'text-sky-700 dark:text-sky-300/80' },
+  { re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, className: 'text-violet-700 dark:text-violet-300/90' },
+  { re: /\bHTTP\s\d{3}\b/g, className: 'text-amber-700 dark:text-amber-300/90' },
 ]
 
 function highlight(line: string): React.ReactNode {
