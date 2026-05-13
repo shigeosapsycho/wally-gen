@@ -1,6 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-const VERSION = '1.3.1'
+const VERSION = '1.3.2'
 
 export function TitleBar() {
   const win = getCurrentWindow()

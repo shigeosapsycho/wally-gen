@@ -15,6 +15,7 @@ export function OutputPage({ onStatus }: Props) {
   const [failed, setFailed] = useState<{ headers: string[]; rows: Row[] }>({ headers: [], rows: [] })
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')
+  const [outcomeFilter, setOutcomeFilter] = useState<string | null>(null)
   const [successSort, setSuccessSort] = useState<Sort>(null)
   const [failedSort, setFailedSort] = useState<Sort>(null)
 
@@ -43,11 +44,14 @@ export function OutputPage({ onStatus }: Props) {
   const sort = sub === 'success' ? successSort : failedSort
   const setSort = sub === 'success' ? setSuccessSort : setFailedSort
 
-  // Apply free-text filter, then optional sort. Default order is whatever the
-  // CSV gave us (engine writes rows in completion order, so unsorted ≈ gen
-  // order).
+  // Apply outcome filter (failures tab only), free-text filter, then optional
+  // sort. Default order is whatever the CSV gave us (engine writes rows in
+  // completion order, so unsorted ≈ gen order).
   const visibleRows = useMemo(() => {
     let out = cur.rows
+    if (sub === 'failed' && outcomeFilter) {
+      out = out.filter((r) => r['outcome'] === outcomeFilter)
+    }
     if (filter.trim()) {
       const f = filter.toLowerCase()
       out = out.filter((r) => Object.values(r).some((v) => v.toLowerCase().includes(f)))
@@ -61,7 +65,7 @@ export function OutputPage({ onStatus }: Props) {
       })
     }
     return out
-  }, [cur.rows, filter, sort])
+  }, [cur.rows, sub, outcomeFilter, filter, sort])
 
   function cycleSort(col: string) {
     setSort((s) => {
@@ -124,7 +128,11 @@ export function OutputPage({ onStatus }: Props) {
       </div>
 
       {sub === 'failed' && failed.rows.length > 0 && (
-        <OutcomeSummary rows={failed.rows} />
+        <OutcomeSummary
+          rows={failed.rows}
+          active={outcomeFilter}
+          onPick={(o) => setOutcomeFilter((cur) => (cur === o ? null : o))}
+        />
       )}
     </div>
   )
@@ -251,7 +259,6 @@ function FailureTable({
         <tr className="text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
           <SortableTh col="email" sort={sort} onSort={onSort}>Email</SortableTh>
           <SortableTh col="outcome" sort={sort} onSort={onSort}>Outcome</SortableTh>
-          <SortableTh col="error_code" sort={sort} onSort={onSort}>Error code</SortableTh>
           <SortableTh col="error_msg" sort={sort} onSort={onSort}>Message</SortableTh>
           <SortableTh col="ts" sort={sort} onSort={onSort} className="w-32">When</SortableTh>
         </tr>
@@ -266,17 +273,13 @@ function FailureTable({
               <OutcomeBadge outcome={r['outcome'] ?? ''} />
             </Td>
             <Td>
-              {r['error_code'] ? (
-                <span className="font-mono text-[11.5px] text-amber-300/90">{r['error_code']}</span>
-              ) : (
-                <span className="text-muted/50">—</span>
-              )}
-            </Td>
-            <Td>
               <span
-                className="font-mono text-[11.5px] text-red-300/80 line-clamp-2 max-w-[640px] block"
+                className="font-mono text-[11.5px] text-red-300/80 line-clamp-2 max-w-[720px] block"
                 title={r['error_msg']}
               >
+                {r['error_code'] && (
+                  <span className="text-amber-300/80 mr-2">{r['error_code']}</span>
+                )}
                 {r['error_msg']}
               </span>
             </Td>
@@ -365,23 +368,56 @@ function outcomeStyle(o: string): { color: string; label: string } {
   }
 }
 
-function OutcomeSummary({ rows }: { rows: Row[] }) {
+function OutcomeSummary({
+  rows,
+  active,
+  onPick,
+}: {
+  rows: Row[]
+  active: string | null
+  onPick: (outcome: string) => void
+}) {
   const counts = useMemo(() => {
     const m = new Map<string, number>()
     for (const r of rows) m.set(r['outcome'] ?? '', (m.get(r['outcome'] ?? '') ?? 0) + 1)
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
   }, [rows])
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 items-center">
+      <span className="text-[11px] text-muted uppercase tracking-[0.12em] mr-1">
+        Filter by outcome:
+      </span>
       {counts.map(([o, n]) => {
         const { color, label } = outcomeStyle(o)
+        const isActive = active === o
+        const dim = active !== null && !isActive
         return (
-          <span key={o} className={'inline-flex items-center gap-2 px-2.5 py-1 rounded text-[11px] font-semibold ' + color}>
+          <button
+            key={o}
+            type="button"
+            onClick={() => onPick(o)}
+            title={isActive ? 'Click to clear filter' : `Show only ${label}`}
+            className={
+              'inline-flex items-center gap-2 px-2.5 py-1 rounded text-[11px] font-semibold transition-all ' +
+              color +
+              (isActive ? ' ring-2 ring-accent ring-offset-2 ring-offset-bg' : '') +
+              (dim ? ' opacity-40 hover:opacity-100' : ' hover:brightness-125')
+            }
+          >
             {label}
             <span className="text-[11px] font-bold tabular-nums opacity-80">{n.toLocaleString()}</span>
-          </span>
+          </button>
         )
       })}
+      {active && (
+        <button
+          type="button"
+          onClick={() => onPick(active)}
+          className="text-[11px] text-muted hover:text-text underline underline-offset-2 ml-2"
+        >
+          clear
+        </button>
+      )}
     </div>
   )
 }
