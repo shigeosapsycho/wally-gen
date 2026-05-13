@@ -250,7 +250,7 @@ export function TasksPage({ onStatus }: Props) {
       </header>
 
       <div className="shrink-0 card px-5 py-3 flex items-center gap-2 text-sm">
-        <RefreshGlyph />
+        <RefreshGlyph spinning={run.state === 'running'} />
         <span className="font-semibold tabular-nums">{emailCount.toLocaleString()}</span>
         <span className="text-muted">emails loaded</span>
         <span className="text-muted">·</span>
@@ -482,9 +482,23 @@ function StatusBadge({ t }: { t: Task }) {
   return <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-card-2 text-muted">pending</span>
 }
 
-function RefreshGlyph() {
+function RefreshGlyph({ spinning }: { spinning?: boolean }) {
+  // The global `data-animations="off"` killswitch on <html> will cancel the
+  // spin animation via styles.css regardless of this class, so the Settings
+  // toggle Just Works without each animated element having to consult the
+  // animations context.
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-accent">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={'text-accent ' + (spinning ? 'animate-spin-slow' : '')}
+    >
       <polyline points="23 4 23 10 17 10" />
       <polyline points="1 20 1 14 7 14" />
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />

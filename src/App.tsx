@@ -12,6 +12,7 @@ import { EmailFilterPage } from './pages/EmailFilter'
 import { RunProvider, useRunCtx } from './state/RunContext'
 import { UpdaterProvider } from './state/UpdaterContext'
 import { ThemeProvider } from './state/ThemeContext'
+import { AnimationsProvider } from './state/AnimationsContext'
 import { FilesProvider, useFilesCtx } from './state/FilesContext'
 import { UpdateBanner } from './components/UpdateBanner'
 import { promoteEmailExists } from './lib/consolidate'
@@ -76,6 +77,7 @@ export function App() {
 
   return (
     <ThemeProvider>
+    <AnimationsProvider>
     <FilesProvider>
     <RunWithFilesBridge onStatus={setStatus}>
       <UpdaterBridge onStatus={setStatus}>
@@ -110,6 +112,7 @@ export function App() {
       </UpdaterBridge>
     </RunWithFilesBridge>
     </FilesProvider>
+    </AnimationsProvider>
     </ThemeProvider>
   )
 }

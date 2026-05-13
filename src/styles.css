@@ -36,6 +36,17 @@
 }
 
 @layer base {
+  /* Global killswitch for all animations / transitions / scroll-behavior.
+   * Toggled by AnimationsProvider via data-animations on <html>. Using
+   * !important so it overrides Tailwind utilities and inline styles alike. */
+  :root[data-animations="off"] *,
+  :root[data-animations="off"] *::before,
+  :root[data-animations="off"] *::after {
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
   html, body, #root {
     height: 100%;
     margin: 0;

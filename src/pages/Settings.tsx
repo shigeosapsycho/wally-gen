@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, envToMap } from '../lib/tauri'
 import { useRunCtx } from '../state/RunContext'
+import { useAnimationsCtx } from '../state/AnimationsContext'
 import { useUpdaterCtx } from '../state/UpdaterContext'
 
 type Props = { onStatus: (s: string) => void; onDirtyChange?: (dirty: boolean) => void }
@@ -179,8 +180,41 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
         </section>
       ))}
 
+      <AppearanceSection />
+
       <UpdatesSection />
     </div>
+  )
+}
+
+function AppearanceSection() {
+  const { enabled, setEnabled } = useAnimationsCtx()
+  return (
+    <section className="card">
+      <h2 className="px-6 pt-5 pb-4 text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+        Appearance
+      </h2>
+      <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
+        <div>
+          <div className="text-sm font-medium text-text">Animations</div>
+          <div className="text-xs text-muted mt-1">
+            Spinning refresh glyph, pulsing dots, fades, and transitions.
+            Turn off if motion is distracting.
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="accent-accent w-4 h-4"
+          />
+          <span className={enabled ? 'text-text' : 'text-muted'}>
+            {enabled ? 'Animations enabled' : 'Animations off'}
+          </span>
+        </label>
+      </div>
+    </section>
   )
 }
 
@@ -194,9 +228,6 @@ function UpdatesSection() {
       <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
         <div>
           <div className="text-sm font-medium text-text">Auto-update</div>
-          <div className="text-xs text-muted mt-1">
-            Checks GitHub Releases on launch. Updates are staged and applied on restart.
-          </div>
         </div>
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3 text-sm">
