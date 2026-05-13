@@ -343,6 +343,7 @@ function SuccessTable({
     <table className="w-full text-sm">
       <thead className="sticky top-0 bg-card/95 backdrop-blur">
         <tr className="text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+          <Th className="w-12 text-right pr-3">#</Th>
           <SortableTh col="email" sort={sort} onSort={onSort}>Email</SortableTh>
           <SortableTh col="password" sort={sort} onSort={onSort}>Password</SortableTh>
           <SortableTh col="authCode" sort={sort} onSort={onSort}>Auth code</SortableTh>
@@ -353,6 +354,11 @@ function SuccessTable({
       <tbody>
         {rows.map((r, i) => (
           <tr key={i} className="border-b border-border/60 hover:bg-card-2/40 group">
+            <Td className="w-12 text-right pr-3">
+              <span className="font-mono text-[11.5px] text-muted/70 tabular-nums">
+                {(i + 1).toLocaleString()}
+              </span>
+            </Td>
             <Td>
               <span className="font-mono text-[12.5px] text-text/90">{r['email']}</span>
             </Td>
