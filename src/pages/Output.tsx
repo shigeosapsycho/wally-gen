@@ -125,8 +125,11 @@ export function OutputPage({ onStatus }: Props) {
               type="button"
               onClick={async () => {
                 const ok = window.confirm(
-                  `Clear all ${failed.rows.length.toLocaleString()} failure rows?\n\n` +
-                    'This wipes accounts-failed.csv. The engine will recreate the file on the next run.',
+                  `Are you sure?\n\n` +
+                    `This will permanently delete all ${failed.rows.length.toLocaleString()} failure rows ` +
+                    `from accounts-failed.csv. This cannot be undone.\n\n` +
+                    `The engine will recreate the file on the next run. ` +
+                    `Press OK to delete, or Cancel to keep them.`,
                 )
                 if (!ok) return
                 try {

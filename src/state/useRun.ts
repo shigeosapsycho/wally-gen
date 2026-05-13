@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
+// Marker the engine prints at the very end of a successful run (run.bat
+// echoes it before the trailing `pause`). Stable enough to use as the
+// "engine is done, reconcile" signal.
+const RUN_COMPLETE_PATTERN = /Run complete/i
+
 export type TaskStatus = 'pending' | 'running' | 'done' | 'failed'
 
 export type Task = {
@@ -38,6 +43,13 @@ export function useRun(onStatus: (s: string) => void) {
           next.push(e.payload)
           return next
         })
+        // run.bat ends with a `pause` that hangs cmd.exe forever in a
+        // hidden window. When the engine prints its "Run complete" banner
+        // we yank the wrapper ourselves and reconcile any tasks the watcher
+        // might have missed under high write load.
+        if (e.payload.stream === 'stdout' && RUN_COMPLETE_PATTERN.test(e.payload.line)) {
+          void finalizeRun()
+        }
       })
       const u2 = await listen<{ email: string; stage: string }>('stage', (e) => {
         setTasks((cur) =>
@@ -125,7 +137,125 @@ export function useRun(onStatus: (s: string) => void) {
     })
   }, [])
 
-  return { state, tasks, logs, start, stop, clearLogs, pushSystemLog }
+  // Guard against firing finalize twice for the same run (run.bat's tally +
+  // the trailing "Run complete" banner can both match the pattern; we only
+  // want to act once).
+  const finalizingRef = useRef(false)
+
+  async function finalizeRun() {
+    if (finalizingRef.current) return
+    finalizingRef.current = true
+    pushSystemLog('Engine reported Run complete — reaping cmd.exe and reconciling tasks.')
+
+    // Kill the cmd.exe wrapper so it doesn't sit on `pause` indefinitely.
+    void invoke('stop_run').catch(() => {})
+
+    // Give any in-flight notify events ~500 ms to land before we snapshot
+    // the CSVs — minimises the chance of a row landing in our reconcile
+    // pass AND a "done"/"fail" event arriving moments later (idempotent
+    // either way, but cleaner this way).
+    await new Promise((r) => setTimeout(r, 500))
+
+    try {
+      const [accountsCsv, failedCsv] = await Promise.all([
+        invoke<string>('read_text_file', { relPath: 'accounts.csv' }).catch(() => ''),
+        invoke<string>('read_text_file', { relPath: 'accounts-failed.csv' }).catch(() => ''),
+      ])
+      const successByEmail = indexCsvByEmail(accountsCsv)
+      const failedByEmail = indexCsvByEmail(failedCsv)
+
+      let reconciled = 0
+      let unknown = 0
+      setTasks((cur) => {
+        const next = new Map(cur)
+        for (const [email, t] of cur) {
+          if (t.status === 'done' || t.status === 'failed') continue
+          const ok = successByEmail.get(email.toLowerCase())
+          if (ok) {
+            next.set(email, { ...t, status: 'done', password: ok['password'] ?? t.password })
+            reconciled++
+            continue
+          }
+          const bad = failedByEmail.get(email.toLowerCase())
+          if (bad) {
+            next.set(email, {
+              ...t,
+              status: 'failed',
+              outcome: bad['outcome'] ?? t.outcome,
+              errorCode: bad['error_code'] ?? t.errorCode,
+              errorMsg: bad['error_msg'] ?? t.errorMsg,
+            })
+            reconciled++
+            continue
+          }
+          // Engine never wrote a terminal row for this email — usually an
+          // unrecoverable transport error before the engine got to the CSV
+          // append. Mark it so the UI doesn't pretend it's still working.
+          next.set(email, { ...t, status: 'failed', outcome: t.outcome ?? 'UNKNOWN' })
+          unknown++
+        }
+        return next
+      })
+
+      pushSystemLog(
+        `Reconcile complete · ${reconciled} row(s) caught up from CSVs · ${unknown} row(s) had no terminal record (marked UNKNOWN).`,
+      )
+    } catch (e) {
+      pushSystemLog(`Reconcile failed: ${e}`)
+    }
+  }
+
+  // Reset the finalize guard whenever a new run starts.
+  const wrappedStart = useCallback(
+    async (emails: string[]) => {
+      finalizingRef.current = false
+      await start(emails)
+    },
+    [start],
+  )
+
+  return { state, tasks, logs, start: wrappedStart, stop, clearLogs, pushSystemLog }
+}
+
+/** Parse a CSV with a header row into a case-insensitive lookup keyed by the
+ *  `email` column. Later rows win on duplicate emails (which matches the
+ *  engine's "last attempt wins" semantics for accounts-failed.csv). */
+function indexCsvByEmail(text: string): Map<string, Record<string, string>> {
+  const out = new Map<string, Record<string, string>>()
+  const lines = text.split(/\r?\n/).filter((l) => l.length > 0)
+  if (lines.length === 0) return out
+  const headers = parseCsvRow(lines[0]!)
+  const emailIdx = headers.findIndex((h) => h.toLowerCase() === 'email')
+  if (emailIdx === -1) return out
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseCsvRow(lines[i]!)
+    const email = (cells[emailIdx] ?? '').trim().toLowerCase()
+    if (!email) continue
+    const row: Record<string, string> = {}
+    for (let j = 0; j < headers.length; j++) row[headers[j]!] = cells[j] ?? ''
+    out.set(email, row)
+  }
+  return out
+}
+
+function parseCsvRow(row: string): string[] {
+  const out: string[] = []
+  let field = ''
+  let inQuotes = false
+  for (let i = 0; i < row.length; i++) {
+    const c = row[i]!
+    if (inQuotes) {
+      if (c === '"') {
+        if (row[i + 1] === '"') { field += '"'; i++ }
+        else inQuotes = false
+      } else field += c
+    } else if (c === ',') { out.push(field); field = '' }
+    else if (c === '"' && field.length === 0) inQuotes = true
+    else if (c === '\r') {}
+    else field += c
+  }
+  out.push(field)
+  return out
 }
 
 function upsert(map: Map<string, Task>, email: string, fn: (t: Task) => Task): Map<string, Task> {

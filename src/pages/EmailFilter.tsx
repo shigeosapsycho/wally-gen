@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api, countNonEmptyLines } from '../lib/tauri'
 import { csvToEmailPass, filterEmailsBySuccess } from '../lib/transforms'
+import { useFilesCtx } from '../state/FilesContext'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -9,6 +10,7 @@ export function EmailFilterPage({ onStatus }: Props) {
   const [master, setMaster] = useState('')
   const [result, setResult] = useState<string[] | null>(null)
   const [busy, setBusy] = useState<'csv' | 'master' | 'save' | null>(null)
+  const files = useFilesCtx()
 
   const successCount = useMemo(() => countNonEmptyLines(success), [success])
   const masterCount = useMemo(() => countNonEmptyLines(master), [master])
@@ -56,6 +58,10 @@ export function EmailFilterPage({ onStatus }: Props) {
     setBusy('save')
     try {
       await api.writeTextFile('emails.txt', result.join('\n') + '\n')
+      // Tell the rest of the app that emails.txt changed so the Tasks
+      // tab's paste box re-reads from disk instead of showing stale
+      // contents.
+      files.bumpEmails()
       onStatus(`Replaced emails.txt (${result.length.toLocaleString()} emails)`)
     } catch (e) {
       onStatus(`Replace failed: ${e}`)

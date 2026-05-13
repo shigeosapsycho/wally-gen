@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CountBadge } from '../components/Card'
 import { api, countNonEmptyLines, envToMap } from '../lib/tauri'
 import { useDebouncedSave } from '../state/useDebouncedSave'
 import { useRunCtx } from '../state/RunContext'
+import { useFilesCtx } from '../state/FilesContext'
 import type { Task } from '../state/useRun'
 
 type Props = { onStatus: (s: string) => void }
@@ -17,31 +18,64 @@ export function TasksPage({ onStatus }: Props) {
   const [maxConcurrent, setMaxConcurrent] = useState(3)
   const [loaded, setLoaded] = useState(false)
   const run = useRunCtx()
+  const files = useFilesCtx()
+  // Suppress the debounced-save when the new value came from an external
+  // re-read (Email Filter "Replace emails.txt", etc.) — otherwise we'd
+  // immediately write the just-loaded content back to disk.
+  const skipNextEmailsSave = useRef(false)
+  const skipNextProxiesSave = useRef(false)
 
+  // Initial env load — runs once.
   useEffect(() => {
     let cancelled = false
-    Promise.all([
-      api.readTextFile('emails.txt').catch(() => ''),
-      api.readTextFile('proxies.txt').catch(() => ''),
-      api.readEnv().catch(() => []),
-    ]).then(([e, p, env]) => {
+    api.readEnv().then((env) => {
       if (cancelled) return
-      setEmails(e)
-      setProxies(p)
       const m = envToMap(env)
       const v = Number.parseInt(m['MAX_CONCURRENT_SOLVES'] ?? '', 10)
       if (Number.isFinite(v) && v > 0) setMaxConcurrent(v)
-      setLoaded(true)
-    })
+    }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
+  // Load emails.txt initially and re-read whenever something else bumps the
+  // tick (e.g. Email Filter overwrote the file).
+  useEffect(() => {
+    let cancelled = false
+    api.readTextFile('emails.txt').then((e) => {
+      if (cancelled) return
+      // Tick > 0 means this is a reload, not the initial mount — suppress
+      // the debounced save that would otherwise write the same content
+      // back to disk.
+      if (files.emailsTick > 0) skipNextEmailsSave.current = true
+      setEmails(e)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [files.emailsTick])
+
+  useEffect(() => {
+    let cancelled = false
+    api.readTextFile('proxies.txt').then((p) => {
+      if (cancelled) return
+      if (files.proxiesTick > 0) skipNextProxiesSave.current = true
+      setProxies(p)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [files.proxiesTick])
+
+  // Mark "loaded" once both initial reads have happened — useDebouncedSave
+  // uses this to skip its first invocation on a cold mount.
+  useEffect(() => {
+    if (!loaded) setLoaded(true)
+  }, [loaded])
+
   useDebouncedSave(emails, (v) => {
     if (!loaded) return
+    if (skipNextEmailsSave.current) { skipNextEmailsSave.current = false; return }
     api.writeTextFile('emails.txt', v).catch((e) => onStatus(`Save failed: ${e}`))
   })
   useDebouncedSave(proxies, (v) => {
     if (!loaded) return
+    if (skipNextProxiesSave.current) { skipNextProxiesSave.current = false; return }
     api.writeTextFile('proxies.txt', v).catch((e) => onStatus(`Save failed: ${e}`))
   })
 
@@ -122,10 +156,10 @@ export function TasksPage({ onStatus }: Props) {
 }
 
 function TaskTable({ tasks }: { tasks: Task[] }) {
-  // Default sort: progress ascending so pending and in-progress emails sit at
-  // the top of the list during a live run. Clicking the header still cycles
-  // through asc → desc → none.
-  const [sort, setSort] = useState<Sort>({ col: 'progress', dir: 'asc' })
+  // Default sort: progress descending so completed (and almost-done) rows
+  // surface at the top of a live run, pending sinks to the bottom. Clicking
+  // the header still cycles through desc → asc → none.
+  const [sort, setSort] = useState<Sort>({ col: 'progress', dir: 'desc' })
 
   const sorted = useMemo(() => {
     if (!sort) return tasks
