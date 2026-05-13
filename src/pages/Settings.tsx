@@ -34,7 +34,7 @@ const GROUPS: Group[] = [
     title: 'IMAP',
     fields: [
       { key: 'IMAP_USER', label: 'IMAP user', hint: 'Catchall mailbox where OTPs arrive', placeholder: 'catchall@gmail.com' },
-      { key: 'IMAP_PASS', label: 'IMAP password', hint: 'Gmail App Password / per-app password (spaces stripped)', type: 'password', placeholder: 'xxxx xxxx xxxx xxxx' },
+      { key: 'IMAP_PASS', label: 'IMAP password', hint: 'Gmail App Password / per-app password (spaces stripped)', placeholder: 'xxxx xxxx xxxx xxxx' },
       { key: 'IMAP_HOST', label: 'IMAP host', hint: 'Pick your provider or choose Other to enter a custom host:port', kind: 'imap-host' },
     ],
   },
