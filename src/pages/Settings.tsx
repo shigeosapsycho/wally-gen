@@ -4,7 +4,7 @@ import { useUpdaterCtx } from '../state/UpdaterContext'
 import { useThemeCtx } from '../state/ThemeContext'
 import type { ThemePreference } from '../state/useTheme'
 
-type Props = { onStatus: (s: string) => void }
+type Props = { onStatus: (s: string) => void; onDirtyChange?: (dirty: boolean) => void }
 
 type FieldSpec = {
   key: string
@@ -60,7 +60,7 @@ const GROUPS: Group[] = [
   },
 ]
 
-export function SettingsPage({ onStatus }: Props) {
+export function SettingsPage({ onStatus, onDirtyChange }: Props) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -72,6 +72,11 @@ export function SettingsPage({ onStatus }: Props) {
       setLoaded(true)
     }).catch((e) => onStatus(`Read .env failed: ${e}`))
   }, [onStatus])
+
+  // Surface the dirty state to App so it can confirm navigation away.
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
 
   function update(key: string, v: string) {
     setValues((s) => ({ ...s, [key]: v }))
@@ -101,14 +106,22 @@ export function SettingsPage({ onStatus }: Props) {
             and order.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={save}
-          disabled={!loaded || saving || !dirty}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+        <div className="flex items-center gap-3">
+          {dirty && !saving && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Unsaved changes
+            </span>
+          )}
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={save}
+            disabled={!loaded || saving || !dirty}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </header>
 
       {GROUPS.map((g) => (

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar, type TabId } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
@@ -15,6 +16,41 @@ import { UpdateBanner } from './components/UpdateBanner'
 export function App() {
   const [tab, setTab] = useState<TabId>('tasks')
   const [status, setStatus] = useState('Ready')
+  const [settingsDirty, setSettingsDirty] = useState(false)
+
+  const changeTab = useCallback(
+    (next: TabId) => {
+      if (next === tab) return
+      if (tab === 'settings' && settingsDirty) {
+        const ok = window.confirm(
+          'You have unsaved settings changes. Leave without saving?\n\n' +
+            'Press OK to discard your changes, or Cancel to stay on Settings.',
+        )
+        if (!ok) return
+        // User chose to discard — the SettingsPage stays mounted with its
+        // edited values; they're just no longer flagged as preventing nav.
+        setSettingsDirty(false)
+      }
+      setTab(next)
+    },
+    [tab, settingsDirty],
+  )
+
+  // Intercept the window's close request when Settings has unsaved changes.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    const win = getCurrentWindow()
+    void win.onCloseRequested((event) => {
+      if (settingsDirty) {
+        const ok = window.confirm(
+          'You have unsaved settings changes. Close without saving?\n\n' +
+            'Press OK to discard and close, or Cancel to stay.',
+        )
+        if (!ok) event.preventDefault()
+      }
+    }).then((un) => { unlisten = un })
+    return () => { unlisten?.() }
+  }, [settingsDirty])
 
   return (
     <ThemeProvider>
@@ -24,13 +60,13 @@ export function App() {
           <TitleBar />
           <UpdateBanner onStatus={setStatus} />
           <div className="flex flex-1 min-h-0">
-            <Sidebar active={tab} onChange={setTab} />
+            <Sidebar active={tab} onChange={changeTab} />
             <main className="flex-1 min-w-0 overflow-hidden relative">
               <Pane visible={tab === 'tasks'} scroll={false}>
                 <TasksPage onStatus={setStatus} />
               </Pane>
               <Pane visible={tab === 'settings'}>
-                <SettingsPage onStatus={setStatus} />
+                <SettingsPage onStatus={setStatus} onDirtyChange={setSettingsDirty} />
               </Pane>
               <Pane visible={tab === 'output'}>
                 <OutputPage onStatus={setStatus} />
