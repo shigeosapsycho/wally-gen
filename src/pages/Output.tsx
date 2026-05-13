@@ -16,6 +16,8 @@ export function OutputPage({ onStatus }: Props) {
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')
   const [outcomeFilter, setOutcomeFilter] = useState<string | null>(null)
+  const [showDupesOnly, setShowDupesOnly] = useState(false)
+  const [providerFilter, setProviderFilter] = useState<ProviderKey | null>(null)
   const [successSort, setSuccessSort] = useState<Sort>(null)
   const [failedSort, setFailedSort] = useState<Sort>(null)
 
@@ -44,13 +46,35 @@ export function OutputPage({ onStatus }: Props) {
   const sort = sub === 'success' ? successSort : failedSort
   const setSort = sub === 'success' ? setSuccessSort : setFailedSort
 
-  // Apply outcome filter (failures tab only), free-text filter, then optional
-  // sort. Default order is whatever the CSV gave us (engine writes rows in
-  // completion order, so unsorted ≈ gen order).
+  // Pre-compute the set of emails that occur 2+ times in the Failures CSV.
+  // Used by the "Show duplicate emails" toggle; cached against `failed.rows`
+  // so toggling doesn't re-scan every keystroke.
+  const dupeEmails = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of failed.rows) {
+      const e = (r['email'] ?? '').toLowerCase()
+      if (!e) continue
+      counts.set(e, (counts.get(e) ?? 0) + 1)
+    }
+    const dupes = new Set<string>()
+    for (const [e, n] of counts) if (n > 1) dupes.add(e)
+    return dupes
+  }, [failed.rows])
+
+  // Apply outcome filter (failures tab only), duplicate filter (failures tab
+  // only), free-text filter, then optional sort. Default order is whatever
+  // the CSV gave us (engine writes rows in completion order, so unsorted ≈
+  // gen order).
   const visibleRows = useMemo(() => {
     let out = cur.rows
     if (sub === 'failed' && outcomeFilter) {
       out = out.filter((r) => r['outcome'] === outcomeFilter)
+    }
+    if (sub === 'failed' && showDupesOnly) {
+      out = out.filter((r) => dupeEmails.has((r['email'] ?? '').toLowerCase()))
+    }
+    if (sub === 'success' && providerFilter) {
+      out = out.filter((r) => providerOf(r['email'] ?? '') === providerFilter)
     }
     if (filter.trim()) {
       const f = filter.toLowerCase()
@@ -65,7 +89,7 @@ export function OutputPage({ onStatus }: Props) {
       })
     }
     return out
-  }, [cur.rows, sub, outcomeFilter, filter, sort])
+  }, [cur.rows, sub, outcomeFilter, showDupesOnly, dupeEmails, providerFilter, filter, sort])
 
   function cycleSort(col: string) {
     setSort((s) => {
@@ -128,10 +152,32 @@ export function OutputPage({ onStatus }: Props) {
       </div>
 
       {sub === 'failed' && failed.rows.length > 0 && (
-        <OutcomeSummary
-          rows={failed.rows}
-          active={outcomeFilter}
-          onPick={(o) => setOutcomeFilter((cur) => (cur === o ? null : o))}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <OutcomeSummary
+            rows={failed.rows}
+            active={outcomeFilter}
+            onPick={(o) => setOutcomeFilter((cur) => (cur === o ? null : o))}
+          />
+          <label className="inline-flex items-center gap-2 text-xs text-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showDupesOnly}
+              onChange={(e) => setShowDupesOnly(e.target.checked)}
+              className="accent-accent w-3.5 h-3.5"
+            />
+            <span className={showDupesOnly ? 'text-text' : ''}>Show duplicate emails</span>
+            <span className="font-mono text-[10.5px] tabular-nums text-muted/70">
+              ({dupeEmails.size.toLocaleString()})
+            </span>
+          </label>
+        </div>
+      )}
+
+      {sub === 'success' && success.rows.length > 0 && (
+        <ProviderSummary
+          rows={success.rows}
+          active={providerFilter}
+          onPick={(p) => setProviderFilter((cur) => (cur === p ? null : p))}
         />
       )}
     </div>
@@ -366,6 +412,107 @@ function outcomeStyle(o: string): { color: string; label: string } {
     default:
       return { color: 'bg-card-2 text-muted', label: o || 'unknown' }
   }
+}
+
+type ProviderKey = 'gmail' | 'icloud' | 'hotmail' | 'outlook' | 'other'
+
+const PROVIDER_DOMAINS: Record<Exclude<ProviderKey, 'other'>, string[]> = {
+  gmail: ['gmail.com', 'googlemail.com'],
+  icloud: ['icloud.com', 'me.com', 'mac.com'],
+  hotmail: ['hotmail.com'],
+  outlook: ['outlook.com', 'live.com', 'msn.com'],
+}
+
+function providerOf(email: string): ProviderKey {
+  const at = email.lastIndexOf('@')
+  if (at < 0) return 'other'
+  const domain = email.slice(at + 1).trim().toLowerCase()
+  for (const [key, domains] of Object.entries(PROVIDER_DOMAINS) as [
+    Exclude<ProviderKey, 'other'>,
+    string[],
+  ][]) {
+    if (domains.includes(domain)) return key
+  }
+  return 'other'
+}
+
+function providerStyle(p: ProviderKey): { color: string; label: string } {
+  switch (p) {
+    case 'gmail':
+      return { color: 'bg-red-500/15 text-red-700 dark:text-red-300', label: 'Gmail' }
+    case 'icloud':
+      return { color: 'bg-sky-500/15 text-sky-700 dark:text-sky-300', label: 'iCloud' }
+    case 'hotmail':
+      return { color: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300', label: 'Hotmail' }
+    case 'outlook':
+      return { color: 'bg-blue-500/15 text-blue-700 dark:text-blue-300', label: 'Outlook' }
+    case 'other':
+      return { color: 'bg-card-2 text-muted', label: 'Other' }
+  }
+}
+
+const PROVIDER_ORDER: ProviderKey[] = ['gmail', 'icloud', 'hotmail', 'outlook', 'other']
+
+function ProviderSummary({
+  rows,
+  active,
+  onPick,
+}: {
+  rows: Row[]
+  active: ProviderKey | null
+  onPick: (p: ProviderKey) => void
+}) {
+  const counts = useMemo(() => {
+    const m = new Map<ProviderKey, number>()
+    for (const r of rows) {
+      const p = providerOf(r['email'] ?? '')
+      m.set(p, (m.get(p) ?? 0) + 1)
+    }
+    // Use the fixed PROVIDER_ORDER, drop zero-count buckets so the strip
+    // never shows "Other 0" etc.
+    return PROVIDER_ORDER.flatMap((p) => {
+      const n = m.get(p) ?? 0
+      return n > 0 ? [[p, n] as const] : []
+    })
+  }, [rows])
+  return (
+    <div className="flex flex-wrap gap-2 items-center">
+      <span className="text-[11px] text-muted uppercase tracking-[0.12em] mr-1">
+        Filter by provider:
+      </span>
+      {counts.map(([p, n]) => {
+        const { color, label } = providerStyle(p)
+        const isActive = active === p
+        const dim = active !== null && !isActive
+        return (
+          <button
+            key={p}
+            type="button"
+            onClick={() => onPick(p)}
+            title={isActive ? 'Click to clear filter' : `Show only ${label}`}
+            className={
+              'inline-flex items-center gap-2 px-2.5 py-1 rounded text-[11px] font-semibold transition-all ' +
+              color +
+              (isActive ? ' ring-2 ring-accent ring-offset-2 ring-offset-bg' : '') +
+              (dim ? ' opacity-40 hover:opacity-100' : ' hover:brightness-125')
+            }
+          >
+            {label}
+            <span className="text-[11px] font-bold tabular-nums opacity-80">{n.toLocaleString()}</span>
+          </button>
+        )
+      })}
+      {active && (
+        <button
+          type="button"
+          onClick={() => onPick(active)}
+          className="text-[11px] text-muted hover:text-text underline underline-offset-2 ml-2"
+        >
+          clear
+        </button>
+      )}
+    </div>
+  )
 }
 
 function OutcomeSummary({

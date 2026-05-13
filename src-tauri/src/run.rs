@@ -121,27 +121,42 @@ pub fn start(app: AppHandle, state: &RunState) -> Result<()> {
 }
 
 pub fn stop(app: AppHandle, state: &RunState) -> Result<()> {
-    let mut slot = state.inner.lock();
-    if let Some(mut handle) = slot.take() {
-        handle.stopped.store(true, Ordering::SeqCst);
+    // Take ownership of the child handle under the lock, then drop the lock
+    // before doing anything slow. taskkill /F /T walks the whole tree (cmd ->
+    // run.bat -> engine -> px-solver -> threads) which can run 1–2s. Doing it
+    // on the calling thread used to freeze the UI for that long because the
+    // command's await never resolved.
+    let handle = {
+        let mut slot = state.inner.lock();
+        slot.take()
+    };
+    let Some(mut handle) = handle else { return Ok(()) };
+    handle.stopped.store(true, Ordering::SeqCst);
 
-        let pid = handle.child.id();
+    let pid = handle.child.id();
+    let app_for_kill = app.clone();
+    std::thread::spawn(move || {
         let status = Command::new("taskkill")
             .args(["/F", "/T", "/PID", &pid.to_string()])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
         if let Err(e) = status {
-            let _ = app.emit(
+            let _ = app_for_kill.emit(
                 "log",
                 LogEvent { line: &format!("[stop] taskkill failed: {e}"), stream: "stderr" },
             );
         }
-
-        // Best-effort wait so child handles are released.
+        // Reap the child so its handle is released for the OS. Best-effort —
+        // by this point taskkill has already destroyed the process.
         let _ = handle.child.wait();
-        let _ = app.emit("exit", ExitEvent { code: None });
-    }
+        let _ = app_for_kill.emit("exit", ExitEvent { code: None });
+    });
+
+    // Tell the renderer right now that the run is over so the Stop button
+    // and task table react instantly. The async exit emit above will arrive
+    // shortly after with a real exit code (None on a kill).
+    let _ = app.emit("exit", ExitEvent { code: None });
     Ok(())
 }
 
