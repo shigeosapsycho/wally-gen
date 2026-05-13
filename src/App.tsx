@@ -11,8 +11,9 @@ import { EmailFilterPage } from './pages/EmailFilter'
 import { RunProvider, useRunCtx } from './state/RunContext'
 import { UpdaterProvider } from './state/UpdaterContext'
 import { ThemeProvider } from './state/ThemeContext'
-import { FilesProvider } from './state/FilesContext'
+import { FilesProvider, useFilesCtx } from './state/FilesContext'
 import { UpdateBanner } from './components/UpdateBanner'
+import { promoteEmailExists } from './lib/consolidate'
 
 export function App() {
   const [tab, setTab] = useState<TabId>('tasks')
@@ -68,7 +69,7 @@ export function App() {
   return (
     <ThemeProvider>
     <FilesProvider>
-    <RunProvider onStatus={setStatus}>
+    <RunWithFilesBridge onStatus={setStatus}>
       <UpdaterBridge onStatus={setStatus}>
         <div className="flex flex-col h-full bg-bg text-text">
           <TitleBar onClose={requestClose} />
@@ -99,9 +100,54 @@ export function App() {
           />
         </div>
       </UpdaterBridge>
-    </RunProvider>
+    </RunWithFilesBridge>
     </FilesProvider>
     </ThemeProvider>
+  )
+}
+
+/** Wires RunProvider so finalizeRun's EMAIL_EXISTS promotion can refresh
+ *  the Output tab via FilesContext ticks, and runs a one-shot promotion
+ *  on app launch to clean up any pre-existing rows. */
+function RunWithFilesBridge({
+  onStatus,
+  children,
+}: {
+  onStatus: (s: string) => void
+  children: React.ReactNode
+}) {
+  const files = useFilesCtx()
+  // Pass a stable bump pair to RunProvider for post-run promotion refreshes.
+  // Both accounts.csv and accounts-failed.csv are rewritten by the promotion
+  // so we bump both ticks.
+  const onPromote = useMemo(
+    () => () => { files.bumpAccounts(); files.bumpFailed() },
+    [files],
+  )
+
+  // One-shot launch sweep: backfill any EMAIL_EXISTS rows from previous
+  // runs that pre-date this feature.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const res = await promoteEmailExists()
+      if (cancelled) return
+      if (res.error) {
+        onStatus(`Promote EMAIL_EXISTS failed: ${res.error}`)
+      } else if (res.promoted > 0) {
+        files.bumpAccounts()
+        files.bumpFailed()
+        onStatus(`Promoted ${res.promoted} EMAIL_EXISTS row(s) to accounts.csv on launch`)
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <RunProvider onStatus={onStatus} hooks={{ onPromoteEmailExists: onPromote }}>
+      {children}
+    </RunProvider>
   )
 }
 

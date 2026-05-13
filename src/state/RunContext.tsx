@@ -1,12 +1,20 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { useRun } from './useRun'
+import { useRun, type RunHooks } from './useRun'
 
 type Ctx = ReturnType<typeof useRun>
 
 const RunCtx = createContext<Ctx | null>(null)
 
-export function RunProvider({ onStatus, children }: { onStatus: (s: string) => void; children: ReactNode }) {
-  const run = useRun(onStatus)
+export function RunProvider({
+  onStatus,
+  hooks,
+  children,
+}: {
+  onStatus: (s: string) => void
+  hooks?: RunHooks
+  children: ReactNode
+}) {
+  const run = useRun(onStatus, hooks)
   return <RunCtx.Provider value={run}>{children}</RunCtx.Provider>
 }
 

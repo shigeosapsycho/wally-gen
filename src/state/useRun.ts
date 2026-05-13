@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { promoteEmailExists } from '../lib/consolidate'
 
 // Marker the engine prints at the very end of a successful run (run.bat
 // echoes it before the trailing `pause`). Stable enough to use as the
@@ -25,7 +26,11 @@ export type RunState = 'idle' | 'running' | 'stopped'
 
 const MAX_LOG_LINES = 10_000
 
-export function useRun(onStatus: (s: string) => void) {
+export type RunHooks = {
+  onPromoteEmailExists?: () => void
+}
+
+export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
   const [state, setState] = useState<RunState>('idle')
   const [tasks, setTasks] = useState<Map<string, Task>>(new Map())
   const [logs, setLogs] = useState<LogLine[]>([])
@@ -206,11 +211,40 @@ export function useRun(onStatus: (s: string) => void) {
       )
     } catch (e) {
       pushSystemLog(`Reconcile failed: ${e}`)
-    } finally {
-      // Always bump completedTick so listeners (endless mode) react even
-      // if reconcile threw — they can read the CSVs themselves.
-      setCompletedTick((t) => t + 1)
     }
+
+    // After reconciliation: sweep accounts-failed.csv for EMAIL_EXISTS rows
+    // not yet in accounts.csv and promote them with placeholder credentials.
+    // Done here because the engine is guaranteed to be stopped by this point
+    // (stop_run was called above), so we won't race the appender.
+    try {
+      const res = await promoteEmailExists()
+      if (res.error) {
+        pushSystemLog(`Promote EMAIL_EXISTS failed: ${res.error}`)
+      } else if (res.promoted > 0) {
+        pushSystemLog(
+          `Promoted ${res.promoted} EMAIL_EXISTS row(s) to accounts.csv (password/authCode/otp = MANUAL).`,
+        )
+        hooks.onPromoteEmailExists?.()
+        // Flip those task rows in our state from failed→done with a MANUAL
+        // password so the Tasks table reflects the same promotion.
+        setTasks((cur) => {
+          const next = new Map(cur)
+          for (const [email, t] of cur) {
+            if (t.status === 'failed' && t.outcome === 'EMAIL_EXISTS') {
+              next.set(email, { ...t, status: 'done', password: 'MANUAL', outcome: undefined })
+            }
+          }
+          return next
+        })
+      }
+    } catch (e) {
+      pushSystemLog(`Promote EMAIL_EXISTS threw: ${e}`)
+    }
+
+    // Always bump completedTick so listeners (endless mode) react even if
+    // reconcile or promote threw — they can read the CSVs themselves.
+    setCompletedTick((t) => t + 1)
   }
 
   // Reset the finalize guard whenever a new run starts.

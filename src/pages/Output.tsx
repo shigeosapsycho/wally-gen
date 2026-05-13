@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/tauri'
+import { useFilesCtx } from '../state/FilesContext'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -28,6 +29,7 @@ export function OutputPage({ onStatus }: Props) {
   const [providerFilter, setProviderFilter] = useState<ProviderKey | null>(null)
   const [successSort, setSuccessSort] = useState<Sort>(null)
   const [failedSort, setFailedSort] = useState<Sort>(null)
+  const files = useFilesCtx()
 
   const load = useMemo(
     () => async () => {
@@ -48,7 +50,9 @@ export function OutputPage({ onStatus }: Props) {
     [onStatus],
   )
 
-  useEffect(() => { void load() }, [load])
+  // Reload whenever either CSV is bumped (post-run promotion sweep,
+  // Clear-all, etc.) so the table stays in sync with disk.
+  useEffect(() => { void load() }, [load, files.accountsTick, files.failedTick])
 
   const cur = sub === 'success' ? success : failed
   const sort = sub === 'success' ? successSort : failedSort
