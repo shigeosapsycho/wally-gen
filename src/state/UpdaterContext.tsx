@@ -1,10 +1,14 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { useUpdater, type UpdaterApi } from './useUpdater'
+import { useUpdater, type UpdaterApi, type UpdaterHooks } from './useUpdater'
 
 const Ctx = createContext<UpdaterApi | null>(null)
 
-export function UpdaterProvider({ children }: { children: ReactNode }) {
-  const api = useUpdater()
+export function UpdaterProvider({
+  pushLog,
+  onStatus,
+  children,
+}: UpdaterHooks & { children: ReactNode }) {
+  const api = useUpdater({ pushLog, onStatus })
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>
 }
 

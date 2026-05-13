@@ -203,12 +203,17 @@ pub fn apply_and_restart() -> Result<()> {
     std::process::exit(0);
 }
 
-pub fn cleanup_after_update() {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let _ = std::fs::remove_file(dir.join("wally-gen.exe.old"));
-        }
+/// Deletes the `.old` exe left behind by a self-update. Returns true if a
+/// `.old` was found, which the caller interprets as "we just upgraded".
+pub fn cleanup_after_update() -> bool {
+    let Ok(exe) = std::env::current_exe() else { return false };
+    let Some(dir) = exe.parent() else { return false };
+    let old = dir.join("wally-gen.exe.old");
+    if !old.is_file() {
+        return false;
     }
+    let _ = std::fs::remove_file(&old);
+    true
 }
 
 /// Compare two `MAJOR.MINOR.PATCH` strings numerically. Falls back to a

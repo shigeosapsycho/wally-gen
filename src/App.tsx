@@ -7,7 +7,7 @@ import { SettingsPage } from './pages/Settings'
 import { OutputPage } from './pages/Output'
 import { LogsPage } from './pages/Logs'
 import { EmailFilterPage } from './pages/EmailFilter'
-import { RunProvider } from './state/RunContext'
+import { RunProvider, useRunCtx } from './state/RunContext'
 import { UpdaterProvider } from './state/UpdaterContext'
 import { UpdateBanner } from './components/UpdateBanner'
 
@@ -16,37 +16,51 @@ export function App() {
   const [status, setStatus] = useState('Ready')
 
   return (
-    <UpdaterProvider>
     <RunProvider onStatus={setStatus}>
-      <div className="flex flex-col h-full bg-bg text-text">
-        <TitleBar />
-        <UpdateBanner onStatus={setStatus} />
-        <div className="flex flex-1 min-h-0">
-          <Sidebar active={tab} onChange={setTab} />
-          <main className="flex-1 min-w-0 overflow-hidden relative">
-            {/* All pages stay mounted so their state survives tab switches.
-                Each page owns its own scroll container (Tasks intentionally
-                doesn't scroll; the rest do). */}
-            <Pane visible={tab === 'tasks'} scroll={false}>
-              <TasksPage onStatus={setStatus} />
-            </Pane>
-            <Pane visible={tab === 'settings'}>
-              <SettingsPage onStatus={setStatus} />
-            </Pane>
-            <Pane visible={tab === 'output'}>
-              <OutputPage onStatus={setStatus} />
-            </Pane>
-            <Pane visible={tab === 'logs'} scroll={false}>
-              <LogsPage onStatus={setStatus} />
-            </Pane>
-            <Pane visible={tab === 'filter'}>
-              <EmailFilterPage onStatus={setStatus} />
-            </Pane>
-          </main>
+      <UpdaterBridge onStatus={setStatus}>
+        <div className="flex flex-col h-full bg-bg text-text">
+          <TitleBar />
+          <UpdateBanner onStatus={setStatus} />
+          <div className="flex flex-1 min-h-0">
+            <Sidebar active={tab} onChange={setTab} />
+            <main className="flex-1 min-w-0 overflow-hidden relative">
+              <Pane visible={tab === 'tasks'} scroll={false}>
+                <TasksPage onStatus={setStatus} />
+              </Pane>
+              <Pane visible={tab === 'settings'}>
+                <SettingsPage onStatus={setStatus} />
+              </Pane>
+              <Pane visible={tab === 'output'}>
+                <OutputPage onStatus={setStatus} />
+              </Pane>
+              <Pane visible={tab === 'logs'} scroll={false}>
+                <LogsPage onStatus={setStatus} />
+              </Pane>
+              <Pane visible={tab === 'filter'}>
+                <EmailFilterPage onStatus={setStatus} />
+              </Pane>
+            </main>
+          </div>
+          <StatusBar text={status} />
         </div>
-        <StatusBar text={status} />
-      </div>
+      </UpdaterBridge>
     </RunProvider>
+  )
+}
+
+/** Bridges the Run log buffer + status bar into the updater hooks so its
+ *  state transitions show up in the Logs tab and the bottom status. */
+function UpdaterBridge({
+  onStatus,
+  children,
+}: {
+  onStatus: (s: string) => void
+  children: React.ReactNode
+}) {
+  const run = useRunCtx()
+  return (
+    <UpdaterProvider pushLog={run.pushSystemLog} onStatus={onStatus}>
+      {children}
     </UpdaterProvider>
   )
 }

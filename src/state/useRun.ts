@@ -14,7 +14,7 @@ export type Task = {
   errorMsg?: string
 }
 
-export type LogLine = { line: string; stream: 'stdout' | 'stderr' }
+export type LogLine = { line: string; stream: 'stdout' | 'stderr' | 'system' }
 
 export type RunState = 'idle' | 'running' | 'stopped'
 
@@ -106,7 +106,15 @@ export function useRun(onStatus: (s: string) => void) {
 
   const clearLogs = useCallback(() => setLogs([]), [])
 
-  return { state, tasks, logs, start, stop, clearLogs }
+  const pushSystemLog = useCallback((line: string) => {
+    setLogs((cur) => {
+      const next = cur.length >= MAX_LOG_LINES ? cur.slice(-MAX_LOG_LINES + 1) : cur.slice()
+      next.push({ line, stream: 'system' })
+      return next
+    })
+  }, [])
+
+  return { state, tasks, logs, start, stop, clearLogs, pushSystemLog }
 }
 
 function upsert(map: Map<string, Task>, email: string, fn: (t: Task) => Task): Map<string, Task> {

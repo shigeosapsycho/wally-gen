@@ -61,7 +61,7 @@ export function LogsPage({ onStatus }: Props) {
   )
 }
 
-function LogRow({ line, stream }: { line: string; stream: 'stdout' | 'stderr' }) {
+function LogRow({ line, stream }: { line: string; stream: 'stdout' | 'stderr' | 'system' }) {
   return (
     <div className={lineColor(line, stream) + ' whitespace-pre-wrap break-all'}>
       {highlight(line || ' ')}
@@ -69,7 +69,8 @@ function LogRow({ line, stream }: { line: string; stream: 'stdout' | 'stderr' })
   )
 }
 
-function lineColor(line: string, stream: 'stdout' | 'stderr'): string {
+function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string {
+  if (stream === 'system') return 'text-accent/85'
   if (stream === 'stderr') return 'text-red-300/85'
   const u = line.toUpperCase()
   if (
