@@ -1,6 +1,6 @@
 [package]
 name = "wally-gen"
-version = "2.3.4"
+version = "2.3.5"
 description = "Wally Gen — desktop UI for the mclovinbot signup runner"
 edition = "2021"
 rust-version = "1.77"

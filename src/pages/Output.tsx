@@ -161,6 +161,37 @@ export function OutputPage({ onStatus }: Props) {
             <button
               type="button"
               onClick={async () => {
+                // Copy whatever the current filters (outcome / duplicates /
+                // free-text filter) have narrowed the table to — deduped
+                // so the user can paste it straight back into emails.txt.
+                const seen = new Set<string>()
+                const lines: string[] = []
+                for (const r of visibleRows) {
+                  const email = (r['email'] ?? '').trim()
+                  if (!email) continue
+                  const key = email.toLowerCase()
+                  if (seen.has(key)) continue
+                  seen.add(key)
+                  lines.push(email)
+                }
+                try {
+                  await navigator.clipboard.writeText(lines.join('\n'))
+                  const scope = outcomeFilter ? ` (${outcomeFilter})` : ''
+                  onStatus(`Copied ${lines.length.toLocaleString()} email(s)${scope}`)
+                } catch (e) {
+                  onStatus(`Copy failed: ${e}`)
+                }
+              }}
+              className="btn-secondary !py-1.5 !px-3 text-xs"
+              title="Copy every email currently shown (respects outcome / duplicate / text filters), deduped"
+            >
+              Copy emails
+            </button>
+          )}
+          {sub === 'failed' && failed.rows.length > 0 && (
+            <button
+              type="button"
+              onClick={async () => {
                 // Native window.confirm() can fail to surface in a Tauri
                 // webview that has decorations:false, so we use the dialog
                 // plugin which renders a proper OS-modal anchored to the
