@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar, type TabId } from './components/Sidebar'
@@ -91,7 +91,7 @@ export function App() {
               </Pane>
             </main>
           </div>
-          <StatusBar
+          <StatusBarBound
             text={status}
             warning={settingsDirty ? 'Unsaved changes in Settings' : undefined}
           />
@@ -116,6 +116,29 @@ function UpdaterBridge({
     <UpdaterProvider pushLog={run.pushSystemLog} onStatus={onStatus}>
       {children}
     </UpdaterProvider>
+  )
+}
+
+/** Reads the run task map so the bottom bar can show live success/fail
+ *  counts without piping them through every page's props. */
+function StatusBarBound({ text, warning }: { text: string; warning?: string }) {
+  const { tasks } = useRunCtx()
+  const { successCount, failCount } = useMemo(() => {
+    let s = 0
+    let f = 0
+    for (const t of tasks.values()) {
+      if (t.status === 'done') s++
+      else if (t.status === 'failed') f++
+    }
+    return { successCount: s, failCount: f }
+  }, [tasks])
+  return (
+    <StatusBar
+      text={text}
+      warning={warning}
+      successCount={successCount}
+      failCount={failCount}
+    />
   )
 }
 

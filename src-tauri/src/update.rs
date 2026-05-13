@@ -203,17 +203,35 @@ pub fn apply_and_restart() -> Result<()> {
     std::process::exit(0);
 }
 
-/// Deletes the `.old` exe left behind by a self-update. Returns true if a
-/// `.old` was found, which the caller interprets as "we just upgraded".
+/// Sweeps `.old` exe leftovers from prior self-updates or hand-deploys.
+/// Matches `wally-gen.exe.old`, `wally-gen.exe.old1`, `wally-gen.exe.old2`,
+/// `wally-gen.exe.old.<timestamp>`, etc. Returns true if at least one was
+/// removed, which the caller interprets as "we just upgraded".
 pub fn cleanup_after_update() -> bool {
     let Ok(exe) = std::env::current_exe() else { return false };
     let Some(dir) = exe.parent() else { return false };
-    let old = dir.join("wally-gen.exe.old");
-    if !old.is_file() {
-        return false;
+    let Ok(entries) = std::fs::read_dir(dir) else { return false };
+    let mut removed = false;
+    for entry in entries.flatten() {
+        let Some(name) = entry.file_name().to_str().map(|s| s.to_string()) else { continue };
+        // Must start with "wally-gen.exe.old" and have either nothing or a
+        // delimiter after — anything that looks like a leftover from a
+        // .old / .old2 / .old.<ts> deploy. The active wally-gen.exe stays.
+        if !name.starts_with("wally-gen.exe.old") {
+            continue;
+        }
+        // Skip the .new staging file used by the in-app updater; that path is
+        // handled by apply_and_restart.
+        if name.ends_with(".new") {
+            continue;
+        }
+        if std::fs::remove_file(entry.path()).is_ok() {
+            removed = true;
+        }
+        // If removal fails (file still locked by another running instance),
+        // that's fine — try again on a future launch.
     }
-    let _ = std::fs::remove_file(&old);
-    true
+    removed
 }
 
 /// Compare two `MAJOR.MINOR.PATCH` strings numerically. Falls back to a

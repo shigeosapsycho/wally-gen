@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, envToMap } from '../lib/tauri'
+import { useRunCtx } from '../state/RunContext'
 import { useUpdaterCtx } from '../state/UpdaterContext'
 
 type Props = { onStatus: (s: string) => void; onDirtyChange?: (dirty: boolean) => void }
@@ -59,6 +60,13 @@ const GROUPS: Group[] = [
 ]
 
 export function SettingsPage({ onStatus, onDirtyChange }: Props) {
+  const run = useRunCtx()
+  // While a run is in progress, the engine has already loaded the current
+  // .env into its process — editing it now would just be confusing (the
+  // new values won't take effect until the next Start). Lock the form to
+  // make that clear instead of silently letting the user edit dead inputs.
+  const locked = run.state === 'running'
+
   const [values, setValues] = useState<Record<string, string>>({})
   // Snapshot of the values as last loaded/saved — `dirty` is derived from
   // comparing this baseline to the current `values`. That way editing a field
@@ -112,7 +120,7 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {dirty && !saving && (
+          {dirty && !saving && !locked && (
             <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
               Unsaved changes
@@ -122,12 +130,25 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
             type="button"
             className="btn-primary"
             onClick={save}
-            disabled={!loaded || saving || !dirty}
+            disabled={!loaded || saving || !dirty || locked}
+            title={locked ? 'A run is in progress — stop it first to edit settings' : undefined}
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </header>
+
+      {locked && (
+        <div className="card flex items-center gap-3 px-4 py-3 text-sm bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          <span>
+            A run is in progress — settings are locked. Stop the run before editing.
+          </span>
+        </div>
+      )}
 
       {GROUPS.map((g) => (
         <section key={g.title} className="card">
@@ -142,7 +163,7 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
                   spec={f}
                   value={values[f.key] ?? ''}
                   onChange={(v) => update(f.key, v)}
-                  disabled={!loaded}
+                  disabled={!loaded || locked}
                 />
               ) : (
                 <Field
@@ -150,7 +171,7 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
                   spec={f}
                   value={values[f.key] ?? ''}
                   onChange={(v) => update(f.key, v)}
-                  disabled={!loaded}
+                  disabled={!loaded || locked}
                 />
               ),
             )}

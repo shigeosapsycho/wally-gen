@@ -120,6 +120,31 @@ export function OutputPage({ onStatus }: Props) {
           <button type="button" className="btn-secondary !py-1.5 !px-3 text-xs" onClick={load} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </button>
+          {sub === 'failed' && failed.rows.length > 0 && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = window.confirm(
+                  `Clear all ${failed.rows.length.toLocaleString()} failure rows?\n\n` +
+                    'This wipes accounts-failed.csv. The engine will recreate the file on the next run.',
+                )
+                if (!ok) return
+                try {
+                  await api.writeTextFile('accounts-failed.csv', '')
+                  setOutcomeFilter(null)
+                  setShowDupesOnly(false)
+                  onStatus('Cleared all failures')
+                  await load()
+                } catch (e) {
+                  onStatus(`Clear failed: ${e}`)
+                }
+              }}
+              className="!py-1.5 !px-3 text-xs rounded-lg border border-red-500/40 text-red-700 dark:text-red-400 hover:bg-red-500/10 transition-colors font-medium"
+              title="Wipe accounts-failed.csv"
+            >
+              Clear all
+            </button>
+          )}
         </div>
       </header>
 

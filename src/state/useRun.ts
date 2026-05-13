@@ -40,7 +40,18 @@ export function useRun(onStatus: (s: string) => void) {
         })
       })
       const u2 = await listen<{ email: string; stage: string }>('stage', (e) => {
-        setTasks((cur) => upsert(cur, e.payload.email, (t) => ({ ...t, status: 'running', stage: e.payload.stage })))
+        setTasks((cur) =>
+          upsert(cur, e.payload.email, (t) => ({
+            ...t,
+            // ACCOUNT_CREATED is the terminal success stage written by the
+            // engine before the accounts.csv tail catches up — treat it as
+            // already done so the badge flips to SUCCESS immediately, even
+            // before the password row shows up. The later `done` event
+            // backfills the password without changing status.
+            status: e.payload.stage === 'ACCOUNT_CREATED' ? 'done' : 'running',
+            stage: e.payload.stage,
+          })),
+        )
       })
       const u3 = await listen<{ email: string; password: string }>('done', (e) => {
         setTasks((cur) => upsert(cur, e.payload.email, (t) => ({ ...t, status: 'done', password: e.payload.password })))
@@ -86,7 +97,7 @@ export function useRun(onStatus: (s: string) => void) {
       try {
         await invoke('start_run')
         setState('running')
-        onStatus(`Running (${emails.length.toLocaleString()})`)
+        onStatus('Running')
       } catch (e) {
         onStatus(`Start failed: ${e}`)
       }

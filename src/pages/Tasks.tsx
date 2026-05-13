@@ -122,7 +122,10 @@ export function TasksPage({ onStatus }: Props) {
 }
 
 function TaskTable({ tasks }: { tasks: Task[] }) {
-  const [sort, setSort] = useState<Sort>(null)
+  // Default sort: progress ascending so pending and in-progress emails sit at
+  // the top of the list during a live run. Clicking the header still cycles
+  // through asc → desc → none.
+  const [sort, setSort] = useState<Sort>({ col: 'progress', dir: 'asc' })
 
   const sorted = useMemo(() => {
     if (!sort) return tasks
@@ -256,7 +259,11 @@ function Row({ t }: { t: Task }) {
           <div
             className={
               'h-full rounded ' +
-              (t.status === 'failed' ? 'bg-red-500/70' : 'bg-accent')
+              (t.status === 'done'
+                ? 'bg-emerald-500'
+                : t.status === 'failed'
+                  ? 'bg-red-500/70'
+                  : 'bg-accent')
             }
             style={{ width: `${pct}%` }}
           />
@@ -270,14 +277,16 @@ function Row({ t }: { t: Task }) {
       </div>
       <div className="font-mono text-[12.5px] text-text/80 truncate">
         {t.password ? (
-          <button
-            type="button"
-            onClick={() => navigator.clipboard.writeText(t.password!)}
-            className="hover:text-accent transition-colors"
-            title="Click to copy"
+          // Read-only display — use Output → Successes to copy. Disabling
+          // selection and right-click discourages casual exfiltration of
+          // passwords from someone glancing at the screen.
+          <span
+            className="select-none"
+            onContextMenu={(e) => e.preventDefault()}
+            onCopy={(e) => e.preventDefault()}
           >
             {t.password}
-          </button>
+          </span>
         ) : (
           <span className="text-muted/60">—</span>
         )}
@@ -288,7 +297,11 @@ function Row({ t }: { t: Task }) {
 
 function StatusBadge({ t }: { t: Task }) {
   if (t.status === 'done') {
-    return <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">done</span>
+    return (
+      <span className="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+        SUCCESS
+      </span>
+    )
   }
   if (t.status === 'failed') {
     return (
