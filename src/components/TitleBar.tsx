@@ -1,16 +1,17 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useThemeCtx } from '../state/ThemeContext'
 
-const VERSION = '1.4.2'
+const VERSION = '1.4.5'
 
-export function TitleBar() {
+export function TitleBar({ onClose }: { onClose?: () => void }) {
   const win = getCurrentWindow()
   const { effective, toggle } = useThemeCtx()
+  const handleClose = onClose ?? (() => void win.close())
 
   return (
     <div
       data-tauri-drag-region
-      className="h-10 shrink-0 flex items-center pl-4 pr-1 select-none border-b border-border bg-bg"
+      className="h-10 shrink-0 flex items-center pl-4 select-none border-b border-border bg-bg"
     >
       <div data-tauri-drag-region className="flex items-center gap-2.5 pointer-events-none">
         <Diamond />
@@ -34,7 +35,7 @@ export function TitleBar() {
         <WinButton onClick={() => win.toggleMaximize()} aria-label="Maximize">
           <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" fill="none" /></svg>
         </WinButton>
-        <WinButton onClick={() => win.close()} aria-label="Close" close>
+        <WinButton onClick={handleClose} aria-label="Close" close>
           <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1 L9 9 M9 1 L1 9" stroke="currentColor" /></svg>
         </WinButton>
       </div>
@@ -69,14 +70,14 @@ function WinButton({
     <button
       type="button"
       onClick={onClick}
+      // Inline border-radius so the close button's hover background matches
+      // Windows 11's ~10px chrome rounding. Tailwind's purger sometimes
+      // drops `rounded-tr-*` when the class only appears in a conditional
+      // string literal — going inline removes that risk.
+      style={close ? { borderTopRightRadius: 10 } : undefined}
       className={
-        'h-10 w-12 inline-flex items-center justify-center text-muted hover:text-text transition-colors ' +
-        // The close button sits at the top-right of a Windows 11 window that
-        // DWM rounds with an 8px radius. Match that on the hover background
-        // so the red doesn't spill past the chrome's rounded corner.
-        (close
-          ? 'hover:bg-red-600 hover:!text-white rounded-tr-lg'
-          : 'hover:bg-card-2')
+        'h-10 w-12 inline-flex items-center justify-center text-muted hover:text-text transition-colors overflow-hidden ' +
+        (close ? 'hover:bg-red-600 hover:!text-white' : 'hover:bg-card-2')
       }
       {...rest}
     >

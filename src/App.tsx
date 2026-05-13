@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar, type TabId } from './components/Sidebar'
@@ -36,20 +36,23 @@ export function App() {
     [tab, settingsDirty],
   )
 
-  // Intercept the window's close request when Settings has unsaved changes.
-  useEffect(() => {
-    let unlisten: (() => void) | undefined
-    const win = getCurrentWindow()
-    void win.onCloseRequested((event) => {
-      if (settingsDirty) {
-        const ok = window.confirm(
-          'You have unsaved settings changes. Close without saving?\n\n' +
-            'Press OK to discard and close, or Cancel to stay.',
-        )
-        if (!ok) event.preventDefault()
-      }
-    }).then((un) => { unlisten = un })
-    return () => { unlisten?.() }
+  // Guard the close click directly rather than via onCloseRequested. The
+  // listener-based approach captured `settingsDirty` in a closure and a stale
+  // closure (left over by Vite HMR + Strict Mode re-mounts) could silently
+  // preventDefault during dev. Handling it on the X button means each click
+  // reads the current value, no listener bookkeeping needed. Trade-off: this
+  // path is bypassed for Alt+F4 / taskbar-close — those go through Tauri's
+  // default close behavior without a prompt.
+  const requestClose = useCallback(() => {
+    if (settingsDirty) {
+      const ok = window.confirm(
+        'You have unsaved settings changes. Close without saving?\n\n' +
+          'Press OK to discard and close, or Cancel to stay.',
+      )
+      if (!ok) return
+      setSettingsDirty(false)
+    }
+    void getCurrentWindow().close()
   }, [settingsDirty])
 
   return (
@@ -57,7 +60,7 @@ export function App() {
     <RunProvider onStatus={setStatus}>
       <UpdaterBridge onStatus={setStatus}>
         <div className="flex flex-col h-full bg-bg text-text">
-          <TitleBar />
+          <TitleBar onClose={requestClose} />
           <UpdateBanner onStatus={setStatus} />
           <div className="flex flex-1 min-h-0">
             <Sidebar active={tab} onChange={changeTab} />

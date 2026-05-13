@@ -7,6 +7,10 @@ import type { Task } from '../state/useRun'
 
 type Props = { onStatus: (s: string) => void }
 
+type SortCol = 'email' | 'progress' | 'status' | 'password'
+type SortDir = 'asc' | 'desc'
+type Sort = { col: SortCol; dir: SortDir } | null
+
 export function TasksPage({ onStatus }: Props) {
   const [emails, setEmails] = useState('')
   const [proxies, setProxies] = useState('')
@@ -118,26 +122,120 @@ export function TasksPage({ onStatus }: Props) {
 }
 
 function TaskTable({ tasks }: { tasks: Task[] }) {
+  const [sort, setSort] = useState<Sort>(null)
+
+  const sorted = useMemo(() => {
+    if (!sort) return tasks
+    const copy = tasks.slice()
+    copy.sort((a, b) => {
+      const av = sortValue(a, sort.col)
+      const bv = sortValue(b, sort.col)
+      let cmp: number
+      if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
+      else cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' })
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+    return copy
+  }, [tasks, sort])
+
+  function cycleSort(col: SortCol) {
+    setSort((s) => {
+      if (!s || s.col !== col) return { col, dir: 'asc' }
+      if (s.dir === 'asc') return { col, dir: 'desc' }
+      return null
+    })
+  }
+
   return (
     <Card className="flex-1 min-h-0">
-      <div className="shrink-0 grid grid-cols-[1fr_180px_140px_180px] px-6 pt-5 pb-3 border-b border-border text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
-        <div>Email</div>
-        <div>Progress</div>
-        <div>Status</div>
-        <div>Password</div>
+      <div className="shrink-0 grid grid-cols-[1fr_180px_140px_180px] px-6 pt-5 pb-3 border-b border-border">
+        <SortableHeader col="email" sort={sort} onSort={cycleSort}>Email</SortableHeader>
+        <SortableHeader col="progress" sort={sort} onSort={cycleSort}>Progress</SortableHeader>
+        <SortableHeader col="status" sort={sort} onSort={cycleSort}>Status</SortableHeader>
+        <SortableHeader col="password" sort={sort} onSort={cycleSort}>Password</SortableHeader>
       </div>
-      {tasks.length === 0 ? (
+      {sorted.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted text-sm">
           no tasks yet — paste emails above and hit start
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto divide-y divide-border/60">
-          {tasks.map((t) => (
+          {sorted.map((t) => (
             <Row key={t.email} t={t} />
           ))}
         </div>
       )}
     </Card>
+  )
+}
+
+const STATUS_ORDER: Record<Task['status'], number> = {
+  running: 0,
+  pending: 1,
+  done: 2,
+  failed: 3,
+}
+
+function sortValue(t: Task, col: SortCol): string | number {
+  switch (col) {
+    case 'email':
+      return t.email.toLowerCase()
+    case 'progress': {
+      if (t.status === 'done') return STAGE_ORDER.length + 1
+      if (t.status === 'failed') return -1
+      if (t.stage) {
+        const i = STAGE_ORDER.indexOf(t.stage)
+        return i >= 0 ? i + 1 : 0
+      }
+      return 0
+    }
+    case 'status':
+      return STATUS_ORDER[t.status]
+    case 'password':
+      // Empty passwords sort to the bottom of asc so completed rows cluster
+      // together regardless of direction.
+      return t.password ?? '￿'
+  }
+}
+
+function SortableHeader({
+  col,
+  sort,
+  onSort,
+  children,
+}: {
+  col: SortCol
+  sort: Sort
+  onSort: (col: SortCol) => void
+  children: React.ReactNode
+}) {
+  const active = sort?.col === col
+  const dir = active ? sort!.dir : null
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(col)}
+      className={
+        'group inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.12em] uppercase transition-colors text-left ' +
+        (active ? 'text-text' : 'text-muted hover:text-text')
+      }
+    >
+      <span>{children}</span>
+      <SortGlyph dir={dir} />
+    </button>
+  )
+}
+
+function SortGlyph({ dir }: { dir: SortDir | null }) {
+  return (
+    <span className="inline-flex flex-col leading-none">
+      <svg width="8" height="5" viewBox="0 0 8 5" className={dir === 'asc' ? 'text-accent' : 'text-muted/40'}>
+        <path d="M0 5 L4 0 L8 5 Z" fill="currentColor" />
+      </svg>
+      <svg width="8" height="5" viewBox="0 0 8 5" className={dir === 'desc' ? 'text-accent' : 'text-muted/40'}>
+        <path d="M0 0 L4 5 L8 0 Z" fill="currentColor" />
+      </svg>
+    </span>
   )
 }
 
