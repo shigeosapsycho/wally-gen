@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { promoteEmailExists } from '../lib/consolidate'
+import { autocleanEnabled, AUTOCLEAN_DUMPS_KEEP } from '../lib/tauri'
 
 // Marker the engine prints at the very end of a successful run (run.bat
 // echoes it before the trailing `pause`). Stable enough to use as the
@@ -144,6 +145,13 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
         }
         return m
       })
+      // If Autoclean Dumps is on, prune old run folders before the engine
+      // creates a fresh one. Fire-and-forget so it never delays run start;
+      // it only ever deletes folders older than the most-recent N, so it
+      // can't race the run we're about to kick off.
+      if (autocleanEnabled()) {
+        void invoke('autoclean_dumps', { keep: AUTOCLEAN_DUMPS_KEEP }).catch(() => {})
+      }
       try {
         await invoke('start_run')
         setState('running')

@@ -261,7 +261,7 @@ export function TasksPage({ onStatus }: Props) {
       <div className="shrink-0 grid grid-cols-2 gap-4">
         <Card title="Email List" badge={<CountBadge count={emailCount} />}>
           <textarea
-            className="mx-4 mb-4 h-32 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
+            className="scrollbar-thin mx-4 mb-4 h-32 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
             placeholder="paste one email per line"
             spellCheck={false}
             value={emails}
@@ -270,7 +270,7 @@ export function TasksPage({ onStatus }: Props) {
         </Card>
         <Card title="Proxy List" badge={<CountBadge count={proxyCount} />}>
           <textarea
-            className="mx-4 mb-4 h-32 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
+            className="scrollbar-thin mx-4 mb-4 h-32 resize-none rounded-md bg-input border border-border px-4 py-3 font-mono text-[13px] text-text/90 placeholder:text-muted/60 focus:outline-none focus:ring-1 focus:ring-accent/40"
             placeholder="paste one proxy per line"
             spellCheck={false}
             value={proxies}
@@ -325,7 +325,7 @@ function TaskTable({ tasks }: { tasks: Task[] }) {
           no tasks yet — paste emails above and hit start
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto divide-y divide-border/60">
+        <div className="scrollbar-thin flex-1 min-h-0 overflow-auto divide-y divide-border/60">
           {sorted.map((t) => (
             <Row key={t.email} t={t} />
           ))}
@@ -414,9 +414,12 @@ function Row({ t }: { t: Task }) {
     t.status === 'done' ? STAGE_ORDER.length :
     t.stage ? Math.max(0, STAGE_ORDER.indexOf(t.stage)) + 1 :
     t.status === 'failed' ? 0 : 0
-  // Stopped rows show a full red bar regardless of how far the engine got —
-  // the user explicitly killed the run, so signal that loudly.
-  const pct = t.status === 'stopped' ? 100 : (stageIdx / STAGE_ORDER.length) * 100
+  // Stopped and failed rows show a full red bar regardless of how far the
+  // engine got — at a glance the row should read as "not a success".
+  const pct =
+    t.status === 'stopped' || t.status === 'failed'
+      ? 100
+      : (stageIdx / STAGE_ORDER.length) * 100
 
   return (
     <div className="grid grid-cols-[1fr_180px_140px_180px] items-center px-6 py-2.5 text-sm">

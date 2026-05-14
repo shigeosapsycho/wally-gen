@@ -1,5 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
 
+// localStorage key + retention count for the "Autoclean Dumps" setting.
+export const AUTOCLEAN_DUMPS_KEY = 'wally-gen.autoclean-dumps'
+export const AUTOCLEAN_DUMPS_KEEP = 3
+
 export const api = {
   targetDir: () => invoke<string>('target_dir'),
   readTextFile: (rel: string) => invoke<string>('read_text_file', { relPath: rel }),
@@ -7,6 +11,17 @@ export const api = {
     invoke<void>('write_text_file', { relPath: rel, content }),
   readEnv: () => invoke<EnvLine[]>('read_env'),
   writeEnv: (values: Record<string, string>) => invoke<void>('write_env', { values }),
+  // Prune dumps/ to the `keep` most-recent run folders; returns the count removed.
+  autocleanDumps: (keep: number) => invoke<number>('autoclean_dumps', { keep }),
+}
+
+/** Whether the Autoclean Dumps setting is currently enabled. */
+export function autocleanEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(AUTOCLEAN_DUMPS_KEY) === 'on'
+  } catch {
+    return false
+  }
 }
 
 export type EnvLine = { kind: 'raw'; data: string } | { kind: 'kv'; key: string; value: string }

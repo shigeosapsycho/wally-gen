@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, envToMap } from '../lib/tauri'
+import { api, envToMap, AUTOCLEAN_DUMPS_KEY, AUTOCLEAN_DUMPS_KEEP } from '../lib/tauri'
 import { useRunCtx } from '../state/RunContext'
 import { useAnimationsCtx } from '../state/AnimationsContext'
 import { useUpdaterCtx } from '../state/UpdaterContext'
@@ -182,8 +182,71 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
 
       <AppearanceSection />
 
+      <AutocleanSection onStatus={onStatus} />
+
       <UpdatesSection />
     </div>
+  )
+}
+
+function AutocleanSection({ onStatus }: { onStatus: (s: string) => void }) {
+  const run = useRunCtx()
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(AUTOCLEAN_DUMPS_KEY) === 'on'
+    } catch {
+      return false
+    }
+  })
+
+  function toggle(next: boolean) {
+    setEnabled(next)
+    try {
+      window.localStorage.setItem(AUTOCLEAN_DUMPS_KEY, next ? 'on' : 'off')
+    } catch {
+      /* localStorage unavailable */
+    }
+    // Prune immediately on enable so the user sees it take effect — but never
+    // mid-run, since the engine is actively writing into the newest folder.
+    if (next && run.state !== 'running') {
+      api
+        .autocleanDumps(AUTOCLEAN_DUMPS_KEEP)
+        .then((n) =>
+          onStatus(
+            n > 0 ? `Autoclean: removed ${n} old dump folder(s)` : 'Autoclean: nothing to remove',
+          ),
+        )
+        .catch((e) => onStatus(`Autoclean failed: ${e}`))
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2 className="px-6 pt-5 pb-4 text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+        Autoclean Dumps
+      </h2>
+      <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
+        <div>
+          <div className="text-sm font-medium text-text">Autoclean dumps</div>
+          <div className="text-xs text-muted mt-1">
+            Keeps only the {AUTOCLEAN_DUMPS_KEEP} most recent run folders in{' '}
+            <code className="font-mono text-text/80">dumps/</code>; older ones are deleted
+            when a run starts.
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => toggle(e.target.checked)}
+            className="accent-accent w-4 h-4"
+          />
+          <span className={enabled ? 'text-text' : 'text-muted'}>
+            {enabled ? `Keeping last ${AUTOCLEAN_DUMPS_KEEP} runs` : 'Autoclean off'}
+          </span>
+        </label>
+      </div>
+    </section>
   )
 }
 

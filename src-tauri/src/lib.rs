@@ -38,6 +38,7 @@ pub fn run() {
             commands::write_text_file,
             commands::read_env,
             commands::write_env,
+            commands::autoclean_dumps,
             commands::start_run,
             commands::stop_run,
             commands::is_running,

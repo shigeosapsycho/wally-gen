@@ -76,4 +76,10 @@
   .pill {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold bg-accent/15 text-accent;
   }
+  /* Slimmer scrollbars for dense scroll regions (e.g. the Tasks tab). Track
+   * and thumb colors still come from the global ::-webkit-scrollbar rules. */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
 }

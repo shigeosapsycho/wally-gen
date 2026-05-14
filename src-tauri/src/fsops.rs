@@ -60,6 +60,43 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
         .with_context(|| format!("rename {} -> {}", tmp.display(), path.display()))
 }
 
+/// Prune `dumps/` down to the `keep` most-recent run subfolders, deleting the
+/// rest. The engine writes each run into its own timestamped subdirectory
+/// (`YYYYMMDD-HHMMSS`), so without this the folder grows without bound.
+/// Returns the number of run folders removed.
+pub fn autoclean_dumps(keep: usize) -> Result<usize> {
+    let dumps = paths::target_dir().join("dumps");
+    if !dumps.is_dir() {
+        return Ok(0);
+    }
+
+    let mut runs: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
+    for entry in std::fs::read_dir(&dumps).with_context(|| format!("read {}", dumps.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        // Fall back to UNIX_EPOCH (oldest) if mtime is unreadable, so a
+        // metadata hiccup makes the folder a deletion candidate rather than
+        // shielding it forever.
+        let mtime = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::UNIX_EPOCH);
+        runs.push((mtime, path));
+    }
+
+    // Most-recent first; everything past `keep` gets removed.
+    runs.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut removed = 0;
+    for (_, path) in runs.into_iter().skip(keep) {
+        std::fs::remove_dir_all(&path).with_context(|| format!("remove {}", path.display()))?;
+        removed += 1;
+    }
+    Ok(removed)
+}
+
 /// Read `.env` as an ordered list of (key, value, comment-or-blank) entries so
 /// the editor can round-trip without losing comments or order.
 pub fn read_env() -> Result<Vec<EnvLine>> {
