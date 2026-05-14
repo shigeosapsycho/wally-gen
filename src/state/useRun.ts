@@ -9,7 +9,7 @@ import { autocleanEnabled, AUTOCLEAN_DUMPS_KEEP } from '../lib/tauri'
 // "engine is done, reconcile" signal.
 const RUN_COMPLETE_PATTERN = /Run complete/i
 
-export type TaskStatus = 'pending' | 'running' | 'done' | 'failed' | 'stopped'
+export type TaskStatus = 'pending' | 'running' | 'done' | 'failed' | 'stopped' | 'exists'
 
 export type Task = {
   email: string
@@ -96,8 +96,15 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
             // engine before the accounts.csv tail catches up — treat it as
             // already done so the badge flips to SUCCESS immediately, even
             // before the password row shows up. The later `done` event
-            // backfills the password without changing status.
-            status: e.payload.stage === 'ACCOUNT_CREATED' ? 'done' : 'running',
+            // backfills the password without changing status. EMAIL_EXISTS
+            // is a terminal "account already exists" stage — its own status
+            // so the row reads EXISTS, not a stuck running:<stage>.
+            status:
+              e.payload.stage === 'ACCOUNT_CREATED'
+                ? 'done'
+                : e.payload.stage === 'EMAIL_EXISTS'
+                  ? 'exists'
+                  : 'running',
             stage: e.payload.stage,
           })),
         )
@@ -109,7 +116,7 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
       const u4 = await listen<{ email: string; outcome: string; errorCode: string; errorMsg: string }>('fail', (e) => {
         setTasks((cur) => upsert(cur, e.payload.email, (t) => ({
           ...t,
-          status: 'failed',
+          status: e.payload.outcome === 'EMAIL_EXISTS' ? 'exists' : 'failed',
           outcome: e.payload.outcome,
           errorCode: e.payload.errorCode,
           errorMsg: e.payload.errorMsg,
@@ -227,7 +234,13 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
       setTasks((cur) => {
         const next = new Map(cur)
         for (const [email, t] of cur) {
-          if (t.status === 'done' || t.status === 'failed' || t.status === 'stopped') continue
+          if (
+            t.status === 'done' ||
+            t.status === 'failed' ||
+            t.status === 'stopped' ||
+            t.status === 'exists'
+          )
+            continue
           const ok = successByEmail.get(email.toLowerCase())
           if (ok) {
             next.set(email, { ...t, status: 'done', password: ok['password'] ?? t.password })
@@ -236,10 +249,11 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
           }
           const bad = failedByEmail.get(email.toLowerCase())
           if (bad) {
+            const outcome = bad['outcome'] ?? t.outcome
             next.set(email, {
               ...t,
-              status: 'failed',
-              outcome: bad['outcome'] ?? t.outcome,
+              status: outcome === 'EMAIL_EXISTS' ? 'exists' : 'failed',
+              outcome,
               errorCode: bad['error_code'] ?? t.errorCode,
               errorMsg: bad['error_msg'] ?? t.errorMsg,
             })
@@ -280,7 +294,7 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
         setTasks((cur) => {
           const next = new Map(cur)
           for (const [email, t] of cur) {
-            if (t.status === 'failed' && t.outcome === 'EMAIL_EXISTS') {
+            if (t.status === 'exists') {
               next.set(email, { ...t, status: 'done', password: 'MANUAL', outcome: undefined })
             }
           }

@@ -341,8 +341,9 @@ const STATUS_ORDER: Record<Task['status'], number> = {
   running: 0,
   pending: 1,
   done: 2,
-  failed: 3,
-  stopped: 4,
+  exists: 3,
+  failed: 4,
+  stopped: 5,
 }
 
 function sortValue(t: Task, col: SortCol): string | number {
@@ -353,6 +354,7 @@ function sortValue(t: Task, col: SortCol): string | number {
       if (t.status === 'done') return STAGE_ORDER.length + 1
       if (t.status === 'failed') return -1
       if (t.status === 'stopped') return -2
+      if (t.status === 'exists') return -1
       if (t.stage) {
         const i = STAGE_ORDER.indexOf(t.stage)
         return i >= 0 ? i + 1 : 0
@@ -416,10 +418,11 @@ function Row({ t }: { t: Task }) {
     t.status === 'done' ? STAGE_ORDER.length :
     t.stage ? Math.max(0, STAGE_ORDER.indexOf(t.stage)) + 1 :
     t.status === 'failed' ? 0 : 0
-  // Stopped and failed rows show a full red bar regardless of how far the
-  // engine got — at a glance the row should read as "not a success".
+  // Stopped/failed/exists rows show a full bar regardless of how far the
+  // engine got — at a glance the row should read as a terminal outcome,
+  // not a success.
   const pct =
-    t.status === 'stopped' || t.status === 'failed'
+    t.status === 'stopped' || t.status === 'failed' || t.status === 'exists'
       ? 100
       : (stageIdx / STAGE_ORDER.length) * 100
 
@@ -433,11 +436,13 @@ function Row({ t }: { t: Task }) {
               'h-full rounded ' +
               (t.status === 'done'
                 ? 'bg-emerald-500'
-                : t.status === 'stopped'
-                  ? 'bg-red-500'
-                  : t.status === 'failed'
-                    ? 'bg-red-500/70'
-                    : 'bg-accent')
+                : t.status === 'exists'
+                  ? 'bg-amber-500'
+                  : t.status === 'stopped'
+                    ? 'bg-red-500'
+                    : t.status === 'failed'
+                      ? 'bg-red-500/70'
+                      : 'bg-accent')
             }
             style={{ width: `${pct}%` }}
           />
@@ -445,7 +450,9 @@ function Row({ t }: { t: Task }) {
         <div className="mt-1 text-[10px] text-muted truncate">
           {t.status === 'stopped'
             ? 'stopped'
-            : (t.stage ?? (t.status === 'pending' ? 'pending' : t.status === 'done' ? 'done' : ''))}
+            : t.status === 'exists'
+              ? 'exists'
+              : (t.stage ?? (t.status === 'pending' ? 'pending' : t.status === 'done' ? 'done' : ''))}
         </div>
       </div>
       <div>
@@ -493,6 +500,13 @@ function StatusBadge({ t }: { t: Task }) {
     return (
       <span className="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide bg-red-500/25 text-red-700 dark:text-red-400">
         STOPPED
+      </span>
+    )
+  }
+  if (t.status === 'exists') {
+    return (
+      <span className="px-2 py-0.5 rounded text-[11px] font-bold tracking-wide bg-amber-500/15 text-amber-700 dark:text-amber-400">
+        EXISTS
       </span>
     )
   }
