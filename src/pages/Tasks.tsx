@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Card, CountBadge } from '../components/Card'
-import { api, countNonEmptyLines, envToMap } from '../lib/tauri'
+import { api, countNonEmptyLines, envToMap, trueEndlessEnabled } from '../lib/tauri'
 import { useDebouncedSave } from '../state/useDebouncedSave'
 import { useRunCtx } from '../state/RunContext'
 import { useFilesCtx } from '../state/FilesContext'
@@ -168,9 +168,11 @@ export function TasksPage({ onStatus }: Props) {
           startedUnderEndlessRef.current = false
           return
         }
-        if (remaining.length >= lastRunListSizeRef.current) {
+        if (remaining.length >= lastRunListSizeRef.current && !trueEndlessEnabled()) {
           // Zero net successes this pass — every remaining email is
-          // failing repeatedly. Stop instead of looping forever.
+          // failing repeatedly. Stop instead of looping forever, unless
+          // "true endless mode" is on, in which case keep chaining anyway
+          // (read live so the user can untoggle it to break the loop).
           onStatus(
             `Endless mode: no progress (${remaining.length.toLocaleString()} remain, all failing). Stopped.`,
           )

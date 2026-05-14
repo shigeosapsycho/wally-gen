@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, envToMap, AUTOCLEAN_DUMPS_KEY, AUTOCLEAN_DUMPS_KEEP } from '../lib/tauri'
+import { api, envToMap, AUTOCLEAN_DUMPS_KEY, AUTOCLEAN_DUMPS_KEEP, TRUE_ENDLESS_KEY } from '../lib/tauri'
 import { useRunCtx } from '../state/RunContext'
 import { useAnimationsCtx } from '../state/AnimationsContext'
 import { useUpdaterCtx } from '../state/UpdaterContext'
@@ -184,8 +184,58 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
 
       <AutocleanSection onStatus={onStatus} />
 
+      <EndlessModeSection />
+
       <UpdatesSection />
     </div>
+  )
+}
+
+function EndlessModeSection() {
+  const [enabled, setEnabled] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(TRUE_ENDLESS_KEY) === 'on'
+    } catch {
+      return false
+    }
+  })
+
+  function toggle(next: boolean) {
+    setEnabled(next)
+    try {
+      window.localStorage.setItem(TRUE_ENDLESS_KEY, next ? 'on' : 'off')
+    } catch {
+      /* localStorage unavailable */
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2 className="px-6 pt-5 pb-4 text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+        Endless mode
+      </h2>
+      <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
+        <div>
+          <div className="text-sm font-medium text-text">Enable true endless mode</div>
+          <div className="text-xs text-muted mt-1">
+            Normally Endless mode stops chaining when a pass makes zero progress
+            (every remaining email failing). With this on, it keeps looping
+            regardless — stop the run manually to break out.
+          </div>
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => toggle(e.target.checked)}
+            className="accent-accent w-4 h-4"
+          />
+          <span className={enabled ? 'text-text' : 'text-muted'}>
+            {enabled ? 'True endless mode on' : 'True endless mode off'}
+          </span>
+        </label>
+      </div>
+    </section>
   )
 }
 

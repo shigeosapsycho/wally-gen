@@ -4,6 +4,10 @@ import { invoke } from '@tauri-apps/api/core'
 export const AUTOCLEAN_DUMPS_KEY = 'wally-gen.autoclean-dumps'
 export const AUTOCLEAN_DUMPS_KEEP = 3
 
+// localStorage key for "true endless mode" — keep chaining Endless-mode runs
+// even when a pass makes zero progress.
+export const TRUE_ENDLESS_KEY = 'wally-gen.true-endless'
+
 export const api = {
   targetDir: () => invoke<string>('target_dir'),
   readTextFile: (rel: string) => invoke<string>('read_text_file', { relPath: rel }),
@@ -19,6 +23,16 @@ export const api = {
 export function autocleanEnabled(): boolean {
   try {
     return window.localStorage.getItem(AUTOCLEAN_DUMPS_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+/** Whether "true endless mode" is enabled — Endless mode keeps chaining even
+ *  when a pass makes no progress. */
+export function trueEndlessEnabled(): boolean {
+  try {
+    return window.localStorage.getItem(TRUE_ENDLESS_KEY) === 'on'
   } catch {
     return false
   }
