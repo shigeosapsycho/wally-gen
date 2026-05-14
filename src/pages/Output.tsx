@@ -27,7 +27,7 @@ export function OutputPage({ onStatus }: Props) {
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')
   const [outcomeFilter, setOutcomeFilter] = useState<string | null>(null)
-  const [showDupesOnly, setShowDupesOnly] = useState(false)
+  const [showUniquesOnly, setShowUniquesOnly] = useState(false)
   const [providerFilter, setProviderFilter] = useState<ProviderKey | null>(null)
   const [successSort, setSuccessSort] = useState<Sort>(null)
   const [failedSort, setFailedSort] = useState<Sort>(null)
@@ -60,19 +60,19 @@ export function OutputPage({ onStatus }: Props) {
   const sort = sub === 'success' ? successSort : failedSort
   const setSort = sub === 'success' ? setSuccessSort : setFailedSort
 
-  // Pre-compute the set of emails that occur 2+ times in the Failures CSV.
-  // Used by the "Show duplicate emails" toggle; cached against `failed.rows`
-  // so toggling doesn't re-scan every keystroke.
-  const dupeEmails = useMemo(() => {
+  // Pre-compute the set of emails that occur exactly once in the Failures
+  // CSV. Used by the "Show non-duplicate emails" toggle; cached against
+  // `failed.rows` so toggling doesn't re-scan every keystroke.
+  const uniqueEmails = useMemo(() => {
     const counts = new Map<string, number>()
     for (const r of failed.rows) {
       const e = (r['email'] ?? '').toLowerCase()
       if (!e) continue
       counts.set(e, (counts.get(e) ?? 0) + 1)
     }
-    const dupes = new Set<string>()
-    for (const [e, n] of counts) if (n > 1) dupes.add(e)
-    return dupes
+    const uniques = new Set<string>()
+    for (const [e, n] of counts) if (n === 1) uniques.add(e)
+    return uniques
   }, [failed.rows])
 
   // Apply outcome filter (failures tab only), duplicate filter (failures tab
@@ -84,8 +84,8 @@ export function OutputPage({ onStatus }: Props) {
     if (sub === 'failed' && outcomeFilter) {
       out = out.filter((r) => r['outcome'] === outcomeFilter)
     }
-    if (sub === 'failed' && showDupesOnly) {
-      out = out.filter((r) => dupeEmails.has((r['email'] ?? '').toLowerCase()))
+    if (sub === 'failed' && showUniquesOnly) {
+      out = out.filter((r) => uniqueEmails.has((r['email'] ?? '').toLowerCase()))
     }
     if (sub === 'success' && providerFilter) {
       out = out.filter((r) => providerOf(r['email'] ?? '') === providerFilter)
@@ -103,7 +103,7 @@ export function OutputPage({ onStatus }: Props) {
       })
     }
     return out
-  }, [cur.rows, sub, outcomeFilter, showDupesOnly, dupeEmails, providerFilter, filter, sort])
+  }, [cur.rows, sub, outcomeFilter, showUniquesOnly, uniqueEmails, providerFilter, filter, sort])
 
   function cycleSort(col: string) {
     setSort((s) => {
@@ -236,7 +236,7 @@ export function OutputPage({ onStatus }: Props) {
                   // our parser into showing "unknown" rows).
                   await api.writeTextFile('accounts-failed.csv', FAILED_HEADER_LINE)
                   setOutcomeFilter(null)
-                  setShowDupesOnly(false)
+                  setShowUniquesOnly(false)
                   onStatus('Cleared all failures')
                   await load()
                 } catch (e) {
@@ -290,13 +290,13 @@ export function OutputPage({ onStatus }: Props) {
           <label className="inline-flex items-center gap-2 text-xs text-muted cursor-pointer select-none">
             <input
               type="checkbox"
-              checked={showDupesOnly}
-              onChange={(e) => setShowDupesOnly(e.target.checked)}
+              checked={showUniquesOnly}
+              onChange={(e) => setShowUniquesOnly(e.target.checked)}
               className="accent-accent w-3.5 h-3.5"
             />
-            <span className={showDupesOnly ? 'text-text' : ''}>Show duplicate emails</span>
+            <span className={showUniquesOnly ? 'text-text' : ''}>Show non-duplicate emails</span>
             <span className="font-mono text-[10.5px] tabular-nums text-muted/70">
-              ({dupeEmails.size.toLocaleString()})
+              ({uniqueEmails.size.toLocaleString()})
             </span>
           </label>
         </div>

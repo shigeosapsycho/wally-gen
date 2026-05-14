@@ -69,19 +69,22 @@ function LogRow({ line, stream }: { line: string; stream: 'stdout' | 'stderr' | 
   )
 }
 
+// Light mode uses stronger `-800` shades at full opacity (the `-700`/reduced
+// opacity tuning was designed for the dark palette and washes out on white);
+// the `dark:` variants keep the original dark-mode look.
 function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string {
-  if (stream === 'system') return 'text-accent/85'
-  if (stream === 'stderr') return 'text-red-700 dark:text-red-300/85'
+  if (stream === 'system') return 'text-accent-dim dark:text-accent/85'
+  if (stream === 'stderr') return 'text-red-800 dark:text-red-300/85'
   const u = line.toUpperCase()
   if (
     u.includes('ACCOUNT_CREATED') ||
     u.includes('SOLVER ONLINE') ||
     u.includes('RUN COMPLETE')
   ) {
-    return 'text-emerald-700 dark:text-emerald-300/90'
+    return 'text-emerald-800 dark:text-emerald-300/90'
   }
   if (u.includes('OTP_DISPATCHED') || u.includes('OTP_RECEIVED')) {
-    return 'text-cyan-700 dark:text-cyan-300/90'
+    return 'text-cyan-800 dark:text-cyan-300/90'
   }
   if (
     u.includes('EDGE_BLOCKED') ||
@@ -92,7 +95,7 @@ function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string
     u.includes('FAILED') ||
     u.includes('TIMED OUT')
   ) {
-    return 'text-red-700 dark:text-red-300/90'
+    return 'text-red-800 dark:text-red-300/90'
   }
   if (
     u.includes('INKIRU_BLOCK') ||
@@ -100,19 +103,19 @@ function lineColor(line: string, stream: 'stdout' | 'stderr' | 'system'): string
     u.includes('WARN') ||
     u.includes('RETRY')
   ) {
-    return 'text-amber-700 dark:text-amber-300/90'
+    return 'text-amber-800 dark:text-amber-300/90'
   }
   if (u.startsWith('==>') || u.startsWith('===') || u.includes('STARTING ')) {
-    return 'text-accent/90'
+    return 'text-accent-dim dark:text-accent/90'
   }
-  return 'text-text/80'
+  return 'text-text dark:text-text/80'
 }
 
 const HIGHLIGHTS: Array<{ re: RegExp; className: string }> = [
-  { re: /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\b/g, className: 'text-muted/80' },
-  { re: /\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/g, className: 'text-sky-700 dark:text-sky-300/80' },
-  { re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, className: 'text-violet-700 dark:text-violet-300/90' },
-  { re: /\bHTTP\s\d{3}\b/g, className: 'text-amber-700 dark:text-amber-300/90' },
+  { re: /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?\b/g, className: 'text-muted dark:text-muted/80' },
+  { re: /\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/g, className: 'text-sky-800 dark:text-sky-300/80' },
+  { re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, className: 'text-violet-800 dark:text-violet-300/90' },
+  { re: /\bHTTP\s\d{3}\b/g, className: 'text-amber-800 dark:text-amber-300/90' },
 ]
 
 function highlight(line: string): React.ReactNode {
