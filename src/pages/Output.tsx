@@ -15,6 +15,7 @@ type Row = Record<string, string>
 const ACCOUNTS_SCHEMA = ['email', 'password', 'authCode', 'identityToken', 'otp']
 const FAILED_SCHEMA = ['email', 'outcome', 'error_code', 'error_msg', 'ts', 'password']
 const FAILED_HEADER_LINE = FAILED_SCHEMA.join(',') + '\n'
+const ACCOUNTS_HEADER_LINE = ACCOUNTS_SCHEMA.join(',') + '\n'
 
 type SortDir = 'asc' | 'desc'
 type Sort = { col: string; dir: SortDir } | null
@@ -155,6 +156,32 @@ export function OutputPage({ onStatus }: Props) {
               title="Copy every success as email:password, one per line"
             >
               Copy all
+            </button>
+          )}
+          {sub === 'success' && success.rows.length > 0 && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await ask(
+                  `This will permanently delete all ${success.rows.length.toLocaleString()} account rows ` +
+                    `from accounts.csv. This cannot be undone.\n\n` +
+                    `The engine will recreate the file on the next run.`,
+                  { title: 'Clear all accounts?', kind: 'warning', okLabel: 'Delete', cancelLabel: 'Cancel' },
+                )
+                if (!ok) return
+                try {
+                  await api.writeTextFile('accounts.csv', ACCOUNTS_HEADER_LINE)
+                  setProviderFilter(null)
+                  onStatus('Cleared all accounts')
+                  await load()
+                } catch (e) {
+                  onStatus(`Clear failed: ${e}`)
+                }
+              }}
+              className="!py-1.5 !px-3 text-xs rounded-lg border border-red-500/40 text-red-700 dark:text-red-400 hover:bg-red-500/10 transition-colors font-medium"
+              title="Wipe accounts.csv"
+            >
+              Clear all
             </button>
           )}
           {sub === 'failed' && failed.rows.length > 0 && (
