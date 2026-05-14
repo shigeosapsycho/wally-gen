@@ -194,9 +194,9 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
 function EndlessModeSection() {
   const [enabled, setEnabled] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem(TRUE_ENDLESS_KEY) === 'on'
+      return window.localStorage.getItem(TRUE_ENDLESS_KEY) !== 'off'
     } catch {
-      return false
+      return true
     }
   })
 
@@ -312,7 +312,6 @@ function AppearanceSection() {
           <div className="text-sm font-medium text-text">Animations</div>
           <div className="text-xs text-muted mt-1">
             Spinning refresh glyph, pulsing dots, fades, and transitions.
-            Turn off if motion is distracting.
           </div>
         </div>
         <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">

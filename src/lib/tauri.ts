@@ -29,12 +29,12 @@ export function autocleanEnabled(): boolean {
 }
 
 /** Whether "true endless mode" is enabled — Endless mode keeps chaining even
- *  when a pass makes no progress. */
+ *  when a pass makes no progress. Defaults to on unless explicitly disabled. */
 export function trueEndlessEnabled(): boolean {
   try {
-    return window.localStorage.getItem(TRUE_ENDLESS_KEY) === 'on'
+    return window.localStorage.getItem(TRUE_ENDLESS_KEY) !== 'off'
   } catch {
-    return false
+    return true
   }
 }
 
