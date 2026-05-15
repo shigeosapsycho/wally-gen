@@ -11,6 +11,14 @@ pub fn read_text_file(rel_path: String) -> Result<String, String> {
     fsops::read_text(&rel_path).map_err(|e| e.to_string())
 }
 
+/// Read an arbitrary absolute path — used when the user has picked a master
+/// list .txt outside the target dir. Path comes from the dialog plugin's
+/// file picker, so it's user-authorized.
+#[tauri::command]
+pub fn read_text_file_abs(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))
+}
+
 #[tauri::command]
 pub fn write_text_file(rel_path: String, content: String) -> Result<(), String> {
     fsops::write_text(&rel_path, &content).map_err(|e| e.to_string())

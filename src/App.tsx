@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { ask } from '@tauri-apps/plugin-dialog'
+import { useConfirm } from './state/ConfirmContext'
 import { TitleBar } from './components/TitleBar'
 import { Sidebar, type TabId } from './components/Sidebar'
 import { StatusBar } from './components/StatusBar'
@@ -21,6 +21,7 @@ export function App() {
   const [tab, setTab] = useState<TabId>('tasks')
   const [status, setStatus] = useState('Ready')
   const [settingsDirty, setSettingsDirty] = useState(false)
+  const confirm = useConfirm()
 
   // `navWarned` suppresses the leave-Settings prompt after the user has
   // acknowledged it once during a single dirty session. The banner in the
@@ -37,10 +38,10 @@ export function App() {
       if (next === tab) return
       if (tab === 'settings' && settingsDirty && !navWarned) {
         // Native confirm() can fail to render on a Tauri window with custom
-        // decorations; the dialog plugin's ask() always anchors a real OS
-        // modal to the window.
+        // decorations; the in-app <ConfirmDialog> renders inside the React
+        // tree so it always anchors correctly and matches the chrome.
         void (async () => {
-          const ok = await ask(
+          const ok = await confirm(
             'You have unsaved settings changes. Leave anyway?\n\n' +
               'Your edits stay pending — you can come back and finish, or save now.',
             { title: 'Leave Settings?', kind: 'warning', okLabel: 'Leave', cancelLabel: 'Stay' },
@@ -53,7 +54,7 @@ export function App() {
       }
       setTab(next)
     },
-    [tab, settingsDirty, navWarned],
+    [tab, settingsDirty, navWarned, confirm],
   )
 
   // Guard the close click directly rather than via onCloseRequested. The
@@ -65,7 +66,7 @@ export function App() {
   // default close behavior without a prompt.
   const requestClose = useCallback(async () => {
     if (settingsDirty) {
-      const ok = await ask(
+      const ok = await confirm(
         'You have unsaved settings changes. Close without saving?',
         { title: 'Close Wally Gen?', kind: 'warning', okLabel: 'Close', cancelLabel: 'Stay' },
       )
@@ -73,7 +74,7 @@ export function App() {
       setSettingsDirty(false)
     }
     void getCurrentWindow().close()
-  }, [settingsDirty])
+  }, [settingsDirty, confirm])
 
   return (
     <ThemeProvider>

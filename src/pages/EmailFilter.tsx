@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
+import { open } from '@tauri-apps/plugin-dialog'
 import { api, countNonEmptyLines } from '../lib/tauri'
 import { csvToEmailPass, filterEmailsBySuccess } from '../lib/transforms'
 import { useFilesCtx } from '../state/FilesContext'
+
+// Persisted path of the user-chosen master-list .txt. When absent, the Master
+// panel falls back to the runtime emails.txt (which can be desynced after
+// engine runs / Endless mode chaining / the Replace action below).
+const MASTER_SOURCE_KEY = 'wally-gen.master-source-path'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -9,7 +15,14 @@ export function EmailFilterPage({ onStatus }: Props) {
   const [success, setSuccess] = useState('')
   const [master, setMaster] = useState('')
   const [result, setResult] = useState<string[] | null>(null)
-  const [busy, setBusy] = useState<'csv' | 'master' | 'save' | null>(null)
+  const [busy, setBusy] = useState<'csv' | 'master' | 'save' | 'pick' | null>(null)
+  const [masterSource, setMasterSource] = useState<string | null>(() => {
+    try {
+      return window.localStorage.getItem(MASTER_SOURCE_KEY)
+    } catch {
+      return null
+    }
+  })
   const files = useFilesCtx()
 
   const successCount = useMemo(() => countNonEmptyLines(success), [success])
@@ -29,17 +42,60 @@ export function EmailFilterPage({ onStatus }: Props) {
     }
   }
 
-  async function loadFromEmailsTxt() {
+  async function loadFromMaster() {
     setBusy('master')
     try {
-      const txt = await api.readTextFile('emails.txt')
+      const txt = masterSource
+        ? await api.readTextFileAbs(masterSource)
+        : await api.readTextFile('emails.txt')
+      const label = masterSource ? basename(masterSource) : 'emails.txt'
       setMaster(txt)
-      onStatus(`Loaded ${countNonEmptyLines(txt).toLocaleString()} from emails.txt`)
+      onStatus(`Loaded ${countNonEmptyLines(txt).toLocaleString()} from ${label}`)
     } catch (e) {
       onStatus(`Load failed: ${e}`)
     } finally {
       setBusy(null)
     }
+  }
+
+  async function pickMasterSource() {
+    setBusy('pick')
+    try {
+      const picked = await open({
+        title: 'Choose a master list .txt',
+        multiple: false,
+        directory: false,
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+      })
+      if (typeof picked !== 'string') return
+      try {
+        window.localStorage.setItem(MASTER_SOURCE_KEY, picked)
+      } catch {
+        /* localStorage unavailable */
+      }
+      setMasterSource(picked)
+      // Load it right away so the panel reflects the new source without a
+      // second click.
+      const txt = await api.readTextFileAbs(picked)
+      setMaster(txt)
+      onStatus(
+        `Referencing ${basename(picked)} (${countNonEmptyLines(txt).toLocaleString()} emails)`,
+      )
+    } catch (e) {
+      onStatus(`Pick failed: ${e}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function resetMasterSource() {
+    try {
+      window.localStorage.removeItem(MASTER_SOURCE_KEY)
+    } catch {
+      /* localStorage unavailable */
+    }
+    setMasterSource(null)
+    onStatus('Master source reset to emails.txt')
   }
 
   function run() {
@@ -90,14 +146,47 @@ export function EmailFilterPage({ onStatus }: Props) {
         />
         <Panel
           title="Master list"
-          subtitle="one email per line"
+          subtitle={
+            masterSource ? `referencing ${basename(masterSource)}` : 'one email per line'
+          }
           count={masterCount}
-          actionLabel={busy === 'master' ? 'Loading…' : 'Load from emails.txt'}
-          onAction={loadFromEmailsTxt}
+          actionLabel={
+            busy === 'master'
+              ? 'Loading…'
+              : `Load from ${masterSource ? basename(masterSource) : 'emails.txt'}`
+          }
+          onAction={loadFromMaster}
           disabled={busy !== null}
           value={master}
           onChange={setMaster}
           placeholder="email@example.com"
+          extra={
+            <div className="px-4 pb-4 text-[11px] text-muted flex items-center gap-3">
+              <button
+                type="button"
+                onClick={pickMasterSource}
+                disabled={busy !== null}
+                title={masterSource ?? 'Pick a permanent .txt to reference instead of emails.txt'}
+                className="underline underline-offset-2 hover:text-text disabled:opacity-50"
+              >
+                {busy === 'pick'
+                  ? 'Picking…'
+                  : masterSource
+                    ? 'change reference'
+                    : 'reference from .txt instead'}
+              </button>
+              {masterSource && (
+                <button
+                  type="button"
+                  onClick={resetMasterSource}
+                  disabled={busy !== null}
+                  className="underline underline-offset-2 hover:text-text disabled:opacity-50"
+                >
+                  reset to emails.txt
+                </button>
+              )}
+            </div>
+          }
         />
       </div>
 
@@ -159,6 +248,7 @@ function Panel({
   value,
   onChange,
   placeholder,
+  extra,
 }: {
   title: string
   subtitle: string
@@ -169,6 +259,7 @@ function Panel({
   value: string
   onChange: (v: string) => void
   placeholder: string
+  extra?: React.ReactNode
 }) {
   return (
     <section className="card flex flex-col">
@@ -196,6 +287,12 @@ function Panel({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {extra}
     </section>
   )
+}
+
+function basename(p: string): string {
+  const i = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'))
+  return i >= 0 ? p.slice(i + 1) : p
 }

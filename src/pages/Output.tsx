@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ask } from '@tauri-apps/plugin-dialog'
 import { api } from '../lib/tauri'
 import { useFilesCtx } from '../state/FilesContext'
+import { useConfirm } from '../state/ConfirmContext'
 
 type Props = { onStatus: (s: string) => void }
 
@@ -32,6 +32,7 @@ export function OutputPage({ onStatus }: Props) {
   const [successSort, setSuccessSort] = useState<Sort>(null)
   const [failedSort, setFailedSort] = useState<Sort>(null)
   const files = useFilesCtx()
+  const confirm = useConfirm()
 
   const load = useMemo(
     () => async () => {
@@ -162,7 +163,7 @@ export function OutputPage({ onStatus }: Props) {
             <button
               type="button"
               onClick={async () => {
-                const ok = await ask(
+                const ok = await confirm(
                   `This will permanently delete all ${success.rows.length.toLocaleString()} account rows ` +
                     `from accounts.csv. This cannot be undone.\n\n` +
                     `The engine will recreate the file on the next run.`,
@@ -220,10 +221,9 @@ export function OutputPage({ onStatus }: Props) {
               type="button"
               onClick={async () => {
                 // Native window.confirm() can fail to surface in a Tauri
-                // webview that has decorations:false, so we use the dialog
-                // plugin which renders a proper OS-modal anchored to the
-                // window.
-                const ok = await ask(
+                // webview that has decorations:false, so we use the in-app
+                // <ConfirmDialog> from ConfirmContext.
+                const ok = await confirm(
                   `This will permanently delete all ${failed.rows.length.toLocaleString()} failure rows ` +
                     `from accounts-failed.csv. This cannot be undone.\n\n` +
                     `The engine will recreate the file on the next run.`,

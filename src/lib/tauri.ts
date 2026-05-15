@@ -11,6 +11,9 @@ export const TRUE_ENDLESS_KEY = 'wally-gen.true-endless'
 export const api = {
   targetDir: () => invoke<string>('target_dir'),
   readTextFile: (rel: string) => invoke<string>('read_text_file', { relPath: rel }),
+  // Read an arbitrary absolute path (used when the user picks a master-list
+  // .txt outside the target dir via the dialog plugin).
+  readTextFileAbs: (path: string) => invoke<string>('read_text_file_abs', { path }),
   writeTextFile: (rel: string, content: string) =>
     invoke<void>('write_text_file', { relPath: rel, content }),
   readEnv: () => invoke<EnvLine[]>('read_env'),
