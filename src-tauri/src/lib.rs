@@ -40,6 +40,7 @@ pub fn run() {
             commands::read_env,
             commands::write_env,
             commands::autoclean_dumps,
+            commands::cap_failed_csv,
             commands::start_run,
             commands::stop_run,
             commands::is_running,

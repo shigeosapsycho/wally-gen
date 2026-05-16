@@ -17,6 +17,10 @@ export const LOG_LINE_CAP_DEFAULT = 1000
 export const LOG_LINE_CAP_MIN = 100
 export const LOG_LINE_CAP_MAX = 50000
 
+// Hard cap on accounts-failed.csv. After a run completes (and on launch) the
+// file is trimmed to this many rows, oldest first. Not user-configurable.
+export const FAILURES_CAP = 10000
+
 export const api = {
   targetDir: () => invoke<string>('target_dir'),
   readTextFile: (rel: string) => invoke<string>('read_text_file', { relPath: rel }),
@@ -29,6 +33,9 @@ export const api = {
   writeEnv: (values: Record<string, string>) => invoke<void>('write_env', { values }),
   // Prune dumps/ to the `keep` most-recent run folders; returns the count removed.
   autocleanDumps: (keep: number) => invoke<number>('autoclean_dumps', { keep }),
+  // Trim accounts-failed.csv to the last `keep` rows (oldest dropped). Caller
+  // must guarantee the engine isn't appending concurrently.
+  capFailedCsv: (keep: number) => invoke<number>('cap_failed_csv', { keep }),
 }
 
 /** Whether the Autoclean Dumps setting is currently enabled. */

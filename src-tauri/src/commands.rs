@@ -40,6 +40,11 @@ pub fn autoclean_dumps(keep: usize) -> Result<usize, String> {
 }
 
 #[tauri::command]
+pub fn cap_failed_csv(keep: usize) -> Result<usize, String> {
+    fsops::cap_failed_csv(keep).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn start_run(app: AppHandle, state: State<RunState>) -> Result<(), String> {
     crate::run::start(app, &state).map_err(|e| e.to_string())
 }

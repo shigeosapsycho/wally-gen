@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { promoteEmailExists } from '../lib/consolidate'
-import { autocleanEnabled, AUTOCLEAN_DUMPS_KEEP, logLineCap } from '../lib/tauri'
+import { autocleanEnabled, AUTOCLEAN_DUMPS_KEEP, FAILURES_CAP, logLineCap } from '../lib/tauri'
 
 // Marker the engine prints at the very end of a successful run (run.bat
 // echoes it before the trailing `pause`). Stable enough to use as the
@@ -312,6 +312,22 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
       }
     } catch (e) {
       pushSystemLog(`Promote EMAIL_EXISTS threw: ${e}`)
+    }
+
+    // Cap accounts-failed.csv so it doesn't grow without bound across many
+    // runs. Safe here because the engine is guaranteed stopped by the
+    // stop_run call above — no race with concurrent appends.
+    try {
+      const removed = await invoke<number>('cap_failed_csv', { keep: FAILURES_CAP })
+      if (removed > 0) {
+        pushSystemLog(
+          `Capped accounts-failed.csv — removed ${removed} oldest row(s) (kept last ${FAILURES_CAP.toLocaleString()}).`,
+        )
+        // Bump the failed tick so the Output tab re-reads the smaller file.
+        scheduleFailBump()
+      }
+    } catch (e) {
+      pushSystemLog(`Cap failures failed: ${e}`)
     }
 
     // Always bump completedTick so listeners (endless mode) react even if

@@ -16,6 +16,7 @@ import { AnimationsProvider } from './state/AnimationsContext'
 import { FilesProvider, useFilesCtx } from './state/FilesContext'
 import { UpdateBanner } from './components/UpdateBanner'
 import { promoteEmailExists } from './lib/consolidate'
+import { api, FAILURES_CAP } from './lib/tauri'
 
 export function App() {
   const [tab, setTab] = useState<TabId>('tasks')
@@ -143,7 +144,8 @@ function RunWithFilesBridge({
   const onDoneRow = useMemo(() => () => files.bumpAccounts(), [files])
 
   // One-shot launch sweep: backfill any EMAIL_EXISTS rows from previous
-  // runs that pre-date this feature.
+  // runs that pre-date this feature, then trim accounts-failed.csv to its
+  // hard cap so old data from before this feature doesn't sit forever.
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -155,6 +157,16 @@ function RunWithFilesBridge({
         files.bumpAccounts()
         files.bumpFailed()
         onStatus(`Promoted ${res.promoted} EMAIL_EXISTS row(s) to accounts.csv on launch`)
+      }
+      try {
+        const removed = await api.capFailedCsv(FAILURES_CAP)
+        if (cancelled) return
+        if (removed > 0) {
+          files.bumpFailed()
+          onStatus(`Capped accounts-failed.csv — removed ${removed} oldest row(s)`)
+        }
+      } catch (e) {
+        onStatus(`Cap failures on launch failed: ${e}`)
       }
     })()
     return () => { cancelled = true }

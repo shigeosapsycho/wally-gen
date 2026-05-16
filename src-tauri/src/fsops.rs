@@ -97,6 +97,53 @@ pub fn autoclean_dumps(keep: usize) -> Result<usize> {
     Ok(removed)
 }
 
+/// Trim `accounts-failed.csv` to the `keep` most-recent rows, preserving the
+/// header. Engine appends rows in completion order, so "most recent" = last
+/// N rows in the file. Returns the number of rows removed (0 if already
+/// under cap or the file doesn't exist). Caller must guarantee the engine
+/// isn't actively appending — atomic write + concurrent append = lost rows.
+pub fn cap_failed_csv(keep: usize) -> Result<usize> {
+    let path = paths::target_dir().join("accounts-failed.csv");
+    if !path.is_file() {
+        return Ok(0);
+    }
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("read {}", path.display()))?;
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        return Ok(0);
+    }
+
+    // Header detection mirrors the frontend's parser: line 0 is a header iff
+    // its first cell is literally `email` (case-insensitive). Otherwise the
+    // engine wrote a headerless file and every line is a data row.
+    let has_header = lines[0]
+        .split(',')
+        .next()
+        .map(|c| c.eq_ignore_ascii_case("email"))
+        .unwrap_or(false);
+    let body_start = if has_header { 1 } else { 0 };
+    let body = &lines[body_start..];
+
+    if body.len() <= keep {
+        return Ok(0);
+    }
+    let removed = body.len() - keep;
+    let kept = &body[removed..];
+
+    let mut out = String::new();
+    if has_header {
+        out.push_str(lines[0]);
+        out.push('\n');
+    }
+    for line in kept {
+        out.push_str(line);
+        out.push('\n');
+    }
+    write_text("accounts-failed.csv", &out)?;
+    Ok(removed)
+}
+
 /// Read `.env` as an ordered list of (key, value, comment-or-blank) entries so
 /// the editor can round-trip without losing comments or order.
 pub fn read_env() -> Result<Vec<EnvLine>> {
