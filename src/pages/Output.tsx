@@ -415,7 +415,7 @@ function SuccessTable({
                 className="text-[11px] text-muted opacity-0 group-hover:opacity-100 transition-opacity hover:text-accent"
                 onClick={() => onCopy(`${r['email']}:${r['password']}`)}
               >
-                copy ↵
+                copy
               </button>
             </Td>
           </tr>
