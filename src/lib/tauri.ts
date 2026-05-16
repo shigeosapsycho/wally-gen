@@ -8,6 +8,15 @@ export const AUTOCLEAN_DUMPS_KEEP = 3
 // even when a pass makes zero progress.
 export const TRUE_ENDLESS_KEY = 'wally-gen.true-endless'
 
+// User-tunable cap on how many log lines the Logs tab keeps in memory; older
+// lines are dropped. The buffer is bounded so an unattended long run can't
+// pin memory. Range is clamped on read so a hand-edited localStorage value
+// can't break the app.
+export const LOG_LINE_CAP_KEY = 'wally-gen.log-line-cap'
+export const LOG_LINE_CAP_DEFAULT = 1000
+export const LOG_LINE_CAP_MIN = 100
+export const LOG_LINE_CAP_MAX = 50000
+
 export const api = {
   targetDir: () => invoke<string>('target_dir'),
   readTextFile: (rel: string) => invoke<string>('read_text_file', { relPath: rel }),
@@ -38,6 +47,19 @@ export function trueEndlessEnabled(): boolean {
     return window.localStorage.getItem(TRUE_ENDLESS_KEY) !== 'off'
   } catch {
     return true
+  }
+}
+
+/** Current log-line cap (clamped to [MIN, MAX], default LOG_LINE_CAP_DEFAULT). */
+export function logLineCap(): number {
+  try {
+    const raw = window.localStorage.getItem(LOG_LINE_CAP_KEY)
+    if (raw == null) return LOG_LINE_CAP_DEFAULT
+    const n = Number.parseInt(raw, 10)
+    if (!Number.isFinite(n)) return LOG_LINE_CAP_DEFAULT
+    return Math.min(LOG_LINE_CAP_MAX, Math.max(LOG_LINE_CAP_MIN, n))
+  } catch {
+    return LOG_LINE_CAP_DEFAULT
   }
 }
 

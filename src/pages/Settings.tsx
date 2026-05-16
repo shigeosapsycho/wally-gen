@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api, envToMap, AUTOCLEAN_DUMPS_KEY, AUTOCLEAN_DUMPS_KEEP, TRUE_ENDLESS_KEY } from '../lib/tauri'
+import {
+  api,
+  envToMap,
+  AUTOCLEAN_DUMPS_KEY,
+  AUTOCLEAN_DUMPS_KEEP,
+  TRUE_ENDLESS_KEY,
+  LOG_LINE_CAP_KEY,
+  LOG_LINE_CAP_DEFAULT,
+  LOG_LINE_CAP_MIN,
+  LOG_LINE_CAP_MAX,
+  logLineCap,
+} from '../lib/tauri'
 import { useRunCtx } from '../state/RunContext'
 import { useAnimationsCtx } from '../state/AnimationsContext'
 import { useUpdaterCtx } from '../state/UpdaterContext'
@@ -186,8 +197,66 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
 
       <EndlessModeSection />
 
+      <LogsSection />
+
       <UpdatesSection />
     </div>
+  )
+}
+
+function LogsSection() {
+  const run = useRunCtx()
+  const [cap, setCap] = useState<number>(() => logLineCap())
+  const [draft, setDraft] = useState<string>(String(cap))
+
+  function commit() {
+    const n = Number.parseInt(draft, 10)
+    if (!Number.isFinite(n)) {
+      setDraft(String(cap))
+      return
+    }
+    const clamped = Math.min(LOG_LINE_CAP_MAX, Math.max(LOG_LINE_CAP_MIN, n))
+    setDraft(String(clamped))
+    try {
+      window.localStorage.setItem(LOG_LINE_CAP_KEY, String(clamped))
+    } catch {
+      /* localStorage unavailable */
+    }
+    setCap(clamped)
+    run.trimLogs()
+  }
+
+  return (
+    <section className="card">
+      <h2 className="px-6 pt-5 pb-4 text-[11px] font-semibold tracking-[0.12em] uppercase text-muted">
+        Logs
+      </h2>
+      <div className="px-6 pb-6 grid grid-cols-[200px_1fr] gap-6 items-start">
+        <div>
+          <div className="text-sm font-medium text-text">Log line cap</div>
+          <div className="text-xs text-muted mt-1">
+            How many lines the Logs tab keeps in memory; older lines are dropped.
+            Default {LOG_LINE_CAP_DEFAULT.toLocaleString()}. Range{' '}
+            {LOG_LINE_CAP_MIN.toLocaleString()}–{LOG_LINE_CAP_MAX.toLocaleString()}.
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur()
+            }}
+            className="w-32 bg-input border border-border rounded-md px-3 py-2 font-mono text-[13px] text-text/90 focus:outline-none focus:ring-1 focus:ring-accent/40"
+            spellCheck={false}
+          />
+          <span className="text-xs text-muted">lines</span>
+        </div>
+      </div>
+    </section>
   )
 }
 

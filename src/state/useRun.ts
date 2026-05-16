@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { promoteEmailExists } from '../lib/consolidate'
-import { autocleanEnabled, AUTOCLEAN_DUMPS_KEEP } from '../lib/tauri'
+import { autocleanEnabled, AUTOCLEAN_DUMPS_KEEP, logLineCap } from '../lib/tauri'
 
 // Marker the engine prints at the very end of a successful run (run.bat
 // echoes it before the trailing `pause`). Stable enough to use as the
@@ -25,7 +25,6 @@ export type LogLine = { line: string; stream: 'stdout' | 'stderr' | 'system' }
 
 export type RunState = 'idle' | 'running' | 'stopped'
 
-const MAX_LOG_LINES = 10_000
 
 export type RunHooks = {
   onPromoteEmailExists?: () => void
@@ -76,7 +75,8 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
     ;(async () => {
       const u1 = await listen<LogLine>('log', (e) => {
         setLogs((cur) => {
-          const next = cur.length >= MAX_LOG_LINES ? cur.slice(-MAX_LOG_LINES + 1) : cur.slice()
+          const cap = logLineCap()
+          const next = cur.length >= cap ? cur.slice(-cap + 1) : cur.slice()
           next.push(e.payload)
           return next
         })
@@ -196,10 +196,19 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
 
   const pushSystemLog = useCallback((line: string) => {
     setLogs((cur) => {
-      const next = cur.length >= MAX_LOG_LINES ? cur.slice(-MAX_LOG_LINES + 1) : cur.slice()
+      const cap = logLineCap()
+      const next = cur.length >= cap ? cur.slice(-cap + 1) : cur.slice()
       next.push({ line, stream: 'system' })
       return next
     })
+  }, [])
+
+  // Trim the buffer to the current log-line cap. Settings calls this after
+  // persisting a new cap so the change is visible immediately, instead of
+  // waiting for the next log line to arrive and trigger the natural trim.
+  const trimLogs = useCallback(() => {
+    const cap = logLineCap()
+    setLogs((cur) => (cur.length > cap ? cur.slice(-cap) : cur))
   }, [])
 
   // Guard against firing finalize twice for the same run (run.bat's tally +
@@ -319,7 +328,7 @@ export function useRun(onStatus: (s: string) => void, hooks: RunHooks = {}) {
     [start],
   )
 
-  return { state, tasks, logs, completedTick, start: wrappedStart, stop, clearLogs, pushSystemLog }
+  return { state, tasks, logs, completedTick, start: wrappedStart, stop, clearLogs, pushSystemLog, trimLogs }
 }
 
 /** Parse a CSV with a header row into a case-insensitive lookup keyed by the
