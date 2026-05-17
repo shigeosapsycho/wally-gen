@@ -78,6 +78,6 @@ pub async fn download_update(app: AppHandle, url: String) -> Result<String, Stri
 }
 
 #[tauri::command]
-pub fn apply_update_and_restart() -> Result<(), String> {
-    update::apply_and_restart().map_err(|e| e.to_string())
+pub fn apply_update_and_restart(app: AppHandle) -> Result<(), String> {
+    update::apply_and_restart(app).map_err(|e| e.to_string())
 }

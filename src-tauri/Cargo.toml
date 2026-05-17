@@ -1,6 +1,6 @@
 [package]
 name = "wally-gen"
-version = "2.4.8"
+version = "2.4.9"
 description = "Wally Gen — desktop UI for the mclovinbot signup runner"
 edition = "2021"
 rust-version = "1.77"
@@ -19,6 +19,7 @@ tauri-build = { version = "2.0", features = [] }
 tauri = { version = "2.1", features = [] }
 tauri-plugin-dialog = "2.0"
 tauri-plugin-opener = "2.2"
+tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 notify = "6.1"

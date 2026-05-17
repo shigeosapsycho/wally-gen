@@ -21,6 +21,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 const GITHUB_REPO: &str = "shigeosapsycho/wally-gen";
 const ASSET_NAME: &str = "wally-gen.exe";
@@ -168,7 +169,7 @@ pub fn download(app: AppHandle, url: String) -> Result<PathBuf> {
     Ok(target)
 }
 
-pub fn apply_and_restart() -> Result<()> {
+pub fn apply_and_restart(app: AppHandle) -> Result<()> {
     let exe = std::env::current_exe().context("current_exe")?;
     let dir = exe.parent().context("exe parent")?;
     let new_exe = dir.join("wally-gen.exe.new");
@@ -193,6 +194,11 @@ pub fn apply_and_restart() -> Result<()> {
         let _ = std::fs::rename(&old_exe, &exe);
         return Err(anyhow::Error::from(e).context("rename .new -> current"));
     }
+
+    // process::exit(0) below bypasses Tauri's Exit event, so the
+    // window-state plugin's on-exit autosave never runs. Persist
+    // position/size now so the relaunched exe restores them.
+    let _ = app.save_window_state(StateFlags::all());
 
     std::process::Command::new(&exe)
         .spawn()

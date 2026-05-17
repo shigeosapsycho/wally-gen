@@ -1,7 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useThemeCtx } from '../state/ThemeContext'
 
-const VERSION = '2.4.8'
+const VERSION = '2.4.9'
 
 export function TitleBar({ onClose }: { onClose?: () => void }) {
   const win = getCurrentWindow()

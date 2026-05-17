@@ -17,6 +17,7 @@ pub fn run() {
         .manage(run::RunState::new())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             let dir = paths::target_dir();
             eprintln!("wally-gen target dir: {}", dir.display());
