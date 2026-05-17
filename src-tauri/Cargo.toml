@@ -1,6 +1,6 @@
 [package]
 name = "wally-gen"
-version = "2.5.0"
+version = "2.5.1"
 description = "Wally Gen — desktop UI for the mclovinbot signup runner"
 edition = "2021"
 rust-version = "1.77"
@@ -30,6 +30,7 @@ parking_lot = "0.12"
 ureq = { version = "2", features = ["json", "tls"] }
 imap = "2.4"
 native-tls = "0.2"
+sysinfo = { version = "0.31", default-features = false, features = ["system"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

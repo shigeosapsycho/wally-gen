@@ -41,6 +41,13 @@ export const api = {
   // for the common providers.
   testImap: (user: string, pass: string, host: string) =>
     invoke<string>('test_imap', { user, pass, host }),
+  // Host hardware ceilings used to cap the local-solver RAM / vCPU sliders.
+  systemInfo: () => invoke<SystemInfo>('system_info'),
+}
+
+export type SystemInfo = {
+  total_ram_gb: number
+  logical_cpus: number
 }
 
 /** Whether the Autoclean Dumps setting is currently enabled. */

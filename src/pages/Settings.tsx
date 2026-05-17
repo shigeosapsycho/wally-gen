@@ -10,6 +10,7 @@ import {
   LOG_LINE_CAP_MIN,
   LOG_LINE_CAP_MAX,
   logLineCap,
+  type SystemInfo,
 } from '../lib/tauri'
 import { useRunCtx } from '../state/RunContext'
 import { useAnimationsCtx } from '../state/AnimationsContext'
@@ -22,7 +23,7 @@ type FieldSpec = {
   label: string
   hint?: string
   type?: 'text' | 'password' | 'number'
-  kind?: 'imap-host'
+  kind?: 'imap-host' | 'ram-slider' | 'cpu-slider'
   placeholder?: string
 }
 
@@ -55,8 +56,8 @@ const GROUPS: Group[] = [
     title: 'Local solver',
     fields: [
       { key: 'LOCAL_SOLVER_PORT', label: 'Port', type: 'number', placeholder: '8080' },
-      { key: 'RAM_GB', label: 'RAM (GB)', hint: 'GOMEMLIMIT for px-solver', type: 'number', placeholder: '2' },
-      { key: 'VCPUS', label: 'vCPUs', hint: 'GOMAXPROCS for px-solver', type: 'number', placeholder: '2' },
+      { key: 'RAM_GB', label: 'RAM (GB)', hint: 'GOMEMLIMIT for px-solver', kind: 'ram-slider' },
+      { key: 'VCPUS', label: 'vCPUs', hint: 'GOMAXPROCS for px-solver', kind: 'cpu-slider' },
       { key: 'MAX_CONCURRENT_SOLVES', label: 'Max concurrent solves', type: 'number', placeholder: '8' },
       { key: 'SOLVER_API_KEY', label: 'Solver API key', placeholder: 'local-mclovinbot' },
     ],
@@ -87,6 +88,9 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
   const [baseline, setBaseline] = useState<Record<string, string>>({})
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Host hardware ceilings for the local-solver sliders. Null until the
+  // Tauri call returns; sliders fall back to a disabled state in the gap.
+  const [sysInfo, setSysInfo] = useState<SystemInfo | null>(null)
 
   const dirty = useMemo(() => !recordsEqual(values, baseline), [values, baseline])
 
@@ -97,6 +101,10 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
       setBaseline(m)
       setLoaded(true)
     }).catch((e) => onStatus(`Read .env failed: ${e}`))
+  }, [onStatus])
+
+  useEffect(() => {
+    api.systemInfo().then(setSysInfo).catch((e) => onStatus(`System info failed: ${e}`))
   }, [onStatus])
 
   // Surface the dirty state to App so it can confirm navigation away.
@@ -168,16 +176,34 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
             {g.title}
           </h2>
           <div className="px-6 pb-6 grid grid-cols-1 gap-5">
-            {g.fields.map((f) =>
-              f.kind === 'imap-host' ? (
-                <ImapHostField
-                  key={f.key}
-                  spec={f}
-                  value={values[f.key] ?? ''}
-                  onChange={(v) => update(f.key, v)}
-                  disabled={!loaded || locked}
-                />
-              ) : (
+            {g.fields.map((f) => {
+              if (f.kind === 'imap-host') {
+                return (
+                  <ImapHostField
+                    key={f.key}
+                    spec={f}
+                    value={values[f.key] ?? ''}
+                    onChange={(v) => update(f.key, v)}
+                    disabled={!loaded || locked}
+                  />
+                )
+              }
+              if (f.kind === 'ram-slider' || f.kind === 'cpu-slider') {
+                const max = f.kind === 'ram-slider' ? sysInfo?.total_ram_gb : sysInfo?.logical_cpus
+                const unit = f.kind === 'ram-slider' ? 'GB' : 'vCPUs'
+                return (
+                  <SliderField
+                    key={f.key}
+                    spec={f}
+                    value={values[f.key] ?? ''}
+                    onChange={(v) => update(f.key, v)}
+                    disabled={!loaded || locked}
+                    max={max}
+                    unit={unit}
+                  />
+                )
+              }
+              return (
                 <Field
                   key={f.key}
                   spec={f}
@@ -185,8 +211,8 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
                   onChange={(v) => update(f.key, v)}
                   disabled={!loaded || locked}
                 />
-              ),
-            )}
+              )
+            })}
             {g.title === 'IMAP' && (
               <ImapTestRow
                 user={values['IMAP_USER'] ?? ''}
@@ -553,6 +579,59 @@ function ImapHostField({
   )
 }
 
+function SliderField({
+  spec,
+  value,
+  onChange,
+  disabled,
+  max,
+  unit,
+}: {
+  spec: FieldSpec
+  value: string
+  onChange: (v: string) => void
+  disabled: boolean
+  // undefined while the system-info Tauri call is still in flight.
+  max: number | undefined
+  unit: string
+}) {
+  const ready = typeof max === 'number' && max >= 1
+  const ceiling = ready ? max : 1
+  const parsed = Number.parseInt(value, 10)
+  // Clamp visible position to [1, ceiling] even when the persisted env value
+  // is empty or exceeds the current host (e.g. .env copied from a beefier
+  // machine). Don't write back on display — only when the user actually moves
+  // the slider — so we don't silently dirty the form on load.
+  const display = Number.isFinite(parsed)
+    ? Math.min(ceiling, Math.max(1, parsed))
+    : Math.min(ceiling, 2)
+
+  return (
+    <div className="grid grid-cols-[200px_1fr] gap-6 items-start">
+      <div>
+        <div className="text-sm font-medium text-text">{spec.label}</div>
+        {spec.hint && <div className="text-xs text-muted mt-1">{spec.hint}</div>}
+        <div className="text-[10px] text-muted/70 font-mono mt-1">{spec.key}</div>
+      </div>
+      <div className="flex items-center gap-4">
+        <input
+          type="range"
+          min={1}
+          max={ceiling}
+          step={1}
+          value={display}
+          onChange={(e) => onChange(String(Math.round(Number(e.target.value))))}
+          disabled={disabled || !ready}
+          className="flex-1 accent-accent disabled:opacity-50"
+        />
+        <div className="font-mono text-sm text-text/90 tabular-nums whitespace-nowrap min-w-[6.5rem] text-right">
+          {display} <span className="text-muted">/ {ceiling} {unit}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Field({
   spec,
   value,
@@ -642,8 +721,7 @@ function ImapTestRow({
       <div>
         <div className="text-sm font-medium text-text">Test connection</div>
         <div className="text-xs text-muted mt-1">
-          Logs into IMAP with the values above to verify they work. Uses the
-          current form values — no save needed.
+          Pings the IMAP to see if the connection works or not.
         </div>
       </div>
       <div className="flex flex-col gap-2 items-start">

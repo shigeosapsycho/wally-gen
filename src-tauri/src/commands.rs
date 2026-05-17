@@ -1,10 +1,37 @@
 use std::collections::HashMap;
 
+use serde::Serialize;
+use sysinfo::System;
 use tauri::{AppHandle, State};
 
 use crate::fsops;
 use crate::run::RunState;
 use crate::update;
+
+#[derive(Serialize)]
+pub struct SystemInfo {
+    pub total_ram_gb: u32,
+    pub logical_cpus: u32,
+}
+
+/// Snapshot of the host's hardware ceilings used to size the local-solver
+/// sliders. RAM is rounded to the nearest whole GB (matches the BIOS-reported
+/// value users recognize); CPU count is from `available_parallelism` so it
+/// respects job-object limits if Tauri is ever launched inside one.
+#[tauri::command]
+pub fn system_info() -> SystemInfo {
+    let mut sys = System::new();
+    sys.refresh_memory();
+    let bytes = sys.total_memory();
+    let gb = ((bytes as f64) / (1024.0 * 1024.0 * 1024.0)).round() as u32;
+    let logical_cpus = std::thread::available_parallelism()
+        .map(|n| n.get() as u32)
+        .unwrap_or(1);
+    SystemInfo {
+        total_ram_gb: gb.max(1),
+        logical_cpus: logical_cpus.max(1),
+    }
+}
 
 #[tauri::command]
 pub fn read_text_file(rel_path: String) -> Result<String, String> {
