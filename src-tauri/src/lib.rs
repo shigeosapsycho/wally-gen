@@ -1,5 +1,6 @@
 mod commands;
 mod fsops;
+mod imap_test;
 mod paths;
 mod run;
 mod update;
@@ -48,6 +49,7 @@ pub fn run() {
             commands::check_for_update,
             commands::download_update,
             commands::apply_update_and_restart,
+            commands::test_imap,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

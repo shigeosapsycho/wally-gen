@@ -52,7 +52,7 @@ export function LogsPage({ onStatus }: Props) {
         className="card flex-1 min-h-0 overflow-auto bg-input font-mono text-[12.5px] leading-[1.55] p-4"
       >
         {logs.length === 0 ? (
-          <div className="text-muted/70 italic">no logs yet — hit Start All on the Tasks tab.</div>
+          <div className="text-muted/70 italic">no logs yet.</div>
         ) : (
           logs.map((l, i) => <LogRow key={i} line={l.line} stream={l.stream} />)
         )}

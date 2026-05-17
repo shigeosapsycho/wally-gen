@@ -81,3 +81,12 @@ pub async fn download_update(app: AppHandle, url: String) -> Result<String, Stri
 pub fn apply_update_and_restart(app: AppHandle) -> Result<(), String> {
     update::apply_and_restart(app).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn test_imap(user: String, pass: String, host: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::imap_test::ping(&user, &pass, &host).map_err(|e| format!("{e:#}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

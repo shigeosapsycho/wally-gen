@@ -36,6 +36,11 @@ export const api = {
   // Trim accounts-failed.csv to the last `keep` rows (oldest dropped). Caller
   // must guarantee the engine isn't appending concurrently.
   capFailedCsv: (keep: number) => invoke<number>('cap_failed_csv', { keep }),
+  // One-shot IMAP login probe against the given credentials. Strips whitespace
+  // from `pass` server-side; an empty `host` triggers domain-based inference
+  // for the common providers.
+  testImap: (user: string, pass: string, host: string) =>
+    invoke<string>('test_imap', { user, pass, host }),
 }
 
 /** Whether the Autoclean Dumps setting is currently enabled. */

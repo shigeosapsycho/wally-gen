@@ -187,6 +187,15 @@ export function SettingsPage({ onStatus, onDirtyChange }: Props) {
                 />
               ),
             )}
+            {g.title === 'IMAP' && (
+              <ImapTestRow
+                user={values['IMAP_USER'] ?? ''}
+                pass={values['IMAP_PASS'] ?? ''}
+                host={values['IMAP_HOST'] ?? ''}
+                disabled={!loaded || locked}
+                onStatus={onStatus}
+              />
+            )}
           </div>
         </section>
       ))}
@@ -588,5 +597,82 @@ function Field({
         )}
       </div>
     </label>
+  )
+}
+
+function ImapTestRow({
+  user,
+  pass,
+  host,
+  disabled,
+  onStatus,
+}: {
+  user: string
+  pass: string
+  host: string
+  disabled: boolean
+  onStatus: (s: string) => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  // Form-level disabled (env not loaded yet / run in progress) is final, but
+  // even when those are clear we still need user+pass before login can mean
+  // anything — block the button rather than send an empty LOGIN.
+  const canTest = !disabled && user.trim().length > 0 && pass.length > 0
+
+  async function test() {
+    setBusy(true)
+    setResult(null)
+    try {
+      const msg = await api.testImap(user, pass, host)
+      setResult({ ok: true, msg })
+      onStatus(`IMAP: ${msg}`)
+    } catch (e) {
+      const msg = String(e).replace(/^Error:\s*/, '')
+      setResult({ ok: false, msg })
+      onStatus(`IMAP test failed: ${msg}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[200px_1fr] gap-6 items-start pt-1">
+      <div>
+        <div className="text-sm font-medium text-text">Test connection</div>
+        <div className="text-xs text-muted mt-1">
+          Logs into IMAP with the values above to verify they work. Uses the
+          current form values — no save needed.
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 items-start">
+        <button
+          type="button"
+          onClick={test}
+          disabled={!canTest || busy}
+          className="btn-secondary !py-1.5 !px-3 text-xs disabled:opacity-50"
+          title={
+            !user.trim() || !pass
+              ? 'Fill in IMAP user and password first'
+              : 'Connect to the IMAP server and log in'
+          }
+        >
+          {busy ? 'Testing…' : 'Test connection'}
+        </button>
+        {result && (
+          <div
+            className={
+              'text-xs px-3 py-2 rounded-md border max-w-full break-words ' +
+              (result.ok
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-300')
+            }
+          >
+            {result.msg}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
