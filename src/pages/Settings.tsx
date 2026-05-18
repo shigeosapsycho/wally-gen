@@ -56,8 +56,8 @@ const GROUPS: Group[] = [
     title: 'Local solver',
     fields: [
       { key: 'LOCAL_SOLVER_PORT', label: 'Port', type: 'number', placeholder: '8080' },
-      { key: 'RAM_GB', label: 'RAM (GB)', hint: 'GOMEMLIMIT for px-solver', kind: 'ram-slider' },
-      { key: 'VCPUS', label: 'vCPUs', hint: 'GOMAXPROCS for px-solver', kind: 'cpu-slider' },
+      { key: 'RAM_GB', label: 'RAM (GB)', hint: 'RAM for PX Solver', kind: 'ram-slider' },
+      { key: 'VCPUS', label: 'vCPUs', hint: 'Logical Processors for px-solver', kind: 'cpu-slider' },
       { key: 'MAX_CONCURRENT_SOLVES', label: 'Max concurrent solves', type: 'number', placeholder: '8' },
       { key: 'SOLVER_API_KEY', label: 'Solver API key', placeholder: 'local-mclovinbot' },
     ],
