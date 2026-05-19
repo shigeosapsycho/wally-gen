@@ -160,6 +160,14 @@ export function TasksPage({ onStatus }: Props) {
           api.readTextFile('accounts.csv').catch(() => ''),
           api.readTextFile('emails.txt').catch(() => ''),
         ])
+        // Recheck after the awaits — user may have unchecked Endless while
+        // we were reading files. Bail before mutating emails.txt or arming
+        // the next run.
+        if (cancelled || !endlessModeRef.current) {
+          onStatus('Endless mode off — chain stopped')
+          startedUnderEndlessRef.current = false
+          return
+        }
         const { lines: successPairs } = csvToEmailPass(accountsCsv)
         const remaining = filterEmailsBySuccess(successPairs.join('\n'), currentMaster)
 

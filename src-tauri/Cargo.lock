@@ -4597,7 +4597,7 @@ dependencies = [
 
 [[package]]
 name = "wally-gen"
-version = "2.5.2"
+version = "2.5.3"
 dependencies = [
  "anyhow",
  "imap",
